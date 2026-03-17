@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1565C0">
+  <title>SurvCompanion Web</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+  <!-- ========== PROJECT LIST VIEW ========== -->
+  <div id="view-projects" class="view active">
+    <header class="app-bar">
+      <h1>SurvCompanion Web</h1>
+      <button class="icon-btn" onclick="App.showNewProjectDialog()" title="Neues Projekt">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </header>
+    <main class="content">
+      <div id="project-list" class="list"></div>
+      <div id="no-projects" class="empty-state" style="display:none">
+        <p>Keine Projekte vorhanden</p>
+        <button class="btn btn-primary" onclick="App.showNewProjectDialog()">Neues Projekt anlegen</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- ========== POINT LIST VIEW ========== -->
+  <div id="view-points" class="view">
+    <header class="app-bar">
+      <button class="icon-btn" onclick="App.showProjects()" title="Zurück">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <h1 id="points-title">Punkte</h1>
+      <button class="icon-btn" onclick="App.showExportDialog()" title="Export">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </header>
+    <main class="content">
+      <div id="point-list" class="list"></div>
+      <div id="no-points" class="empty-state" style="display:none">
+        <p>Keine Punkte erfasst</p>
+      </div>
+    </main>
+    <button class="fab" onclick="App.showPointForm()" title="Neuen Punkt erfassen">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+  </div>
+
+  <!-- ========== POINT FORM VIEW ========== -->
+  <div id="view-point-form" class="view">
+    <header class="app-bar">
+      <button class="icon-btn" onclick="App.cancelPointForm()" title="Abbrechen">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <h1 id="point-form-title">Punkt erfassen</h1>
+      <button class="icon-btn" onclick="App.savePoint()" title="Speichern">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+    </header>
+    <main class="content form-content">
+      <form id="point-form" onsubmit="return false">
+
+        <!-- Grunddaten -->
+        <section class="form-section expanded" data-section="grunddaten">
+          <div class="section-header" onclick="App.toggleSection(this)">
+            <h2>Grunddaten</h2>
+            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="section-body">
+            <div class="form-row">
+              <div class="form-group flex-2">
+                <label for="f-punktId">Punkt-ID *</label>
+                <input type="text" id="f-punktId" required placeholder="z.B. PS12345">
+              </div>
+              <div class="form-group flex-1">
+                <label for="f-gicCode">GIC-Code</label>
+                <input type="text" id="f-gicCode" placeholder="100-157" inputmode="numeric">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="f-strecke">Strecke *</label>
+                <input type="text" id="f-strecke" required placeholder="z.B. 1234">
+              </div>
+              <div class="form-group flex-1">
+                <label for="f-station">Station</label>
+                <input type="text" id="f-station" placeholder="z.B. 123.345" inputmode="decimal">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="f-art">Art *</label>
+                <select id="f-art" onchange="App.onArtChanged()">
+                  <option value="ps0">PS0</option>
+                  <option value="ps1">PS1</option>
+                  <option value="ps2">PS2</option>
+                  <option value="ps3">PS3</option>
+                  <option value="ps4" selected>PS4</option>
+                  <option value="tp">TP</option>
+                  <option value="lhp">LHP</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label for="f-seite">Seite *</label>
+                <select id="f-seite">
+                  <option value="links">Links</option>
+                  <option value="rechts">Rechts</option>
+                  <option value="mittig">Mittig</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="f-erfasser">Erfasser *</label>
+              <input type="text" id="f-erfasser" required placeholder="Name des Erfassers">
+            </div>
+          </div>
+        </section>
+
+        <!-- Status -->
+        <section class="form-section" data-section="status">
+          <div class="section-header" onclick="App.toggleSection(this)">
+            <h2>Status</h2>
+            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="section-body">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="f-neuOderBestand">Typ</label>
+                <select id="f-neuOderBestand">
+                  <option value="bestandspunkt">Bestandspunkt</option>
+                  <option value="neupunkt">Neupunkt</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label for="f-status">Zustand</label>
+                <select id="f-status">
+                  <option value="intakt">Intakt</option>
+                  <option value="zerstoert">Zerstört</option>
+                  <option value="nichtGefunden">Nicht gefunden</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="f-rilKonformitaet">RIL-Konform</label>
+                <select id="f-rilKonformitaet">
+                  <option value="ja">Ja</option>
+                  <option value="nein">Nein</option>
+                </select>
+              </div>
+              <div class="form-group flex-1" id="gnss-group">
+                <label for="f-gnssTauglichkeit">GNSS</label>
+                <select id="f-gnssTauglichkeit">
+                  <option value="">-- k.A. --</option>
+                  <option value="ja">Ja</option>
+                  <option value="nein">Nein</option>
+                  <option value="eingeschraenkt">Eingeschränkt</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="f-einmessskizze">Punktbeschreibung</label>
+              <select id="f-einmessskizze">
+                <option value="nichtVorhanden">Keine Punktbeschreibung</option>
+                <option value="vorhanden">Vorhanden</option>
+                <option value="neuErstellt">Neu erstellt</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- Art-Spezifische Attribute -->
+        <section class="form-section" data-section="art-spezifisch">
+          <div class="section-header" onclick="App.toggleSection(this)">
+            <h2>Art-Spezifische Attribute</h2>
+            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="section-body" id="art-specific-fields">
+            <!-- Dynamically populated based on selected art -->
+          </div>
+        </section>
+
+        <!-- Koordinaten -->
+        <section class="form-section" data-section="koordinaten">
+          <div class="section-header" onclick="App.toggleSection(this)">
+            <h2>Koordinaten</h2>
+            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="section-body">
+            <button type="button" class="btn btn-secondary btn-block" onclick="App.captureGPS()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
+              GPS-Position erfassen
+            </button>
+            <div class="form-row" style="margin-top:12px">
+              <div class="form-group flex-1">
+                <label for="f-gpsLatitude">Breitengrad</label>
+                <input type="text" id="f-gpsLatitude" placeholder="z.B. 51.123456" inputmode="decimal">
+              </div>
+              <div class="form-group flex-1">
+                <label for="f-gpsLongitude">Längengrad</label>
+                <input type="text" id="f-gpsLongitude" placeholder="z.B. 9.123456" inputmode="decimal">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="f-hoehe">Höhe (m)</label>
+                <input type="text" id="f-hoehe" placeholder="Höhe ü. NN" inputmode="decimal">
+              </div>
+              <div class="form-group flex-1">
+                <label for="f-gpsAccuracy">Genauigkeit (m)</label>
+                <input type="text" id="f-gpsAccuracy" readonly placeholder="automatisch">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="f-dbrefX">DBRef X (Rechtswert)</label>
+                <input type="text" id="f-dbrefX" placeholder="optional" inputmode="decimal">
+              </div>
+              <div class="form-group flex-1">
+                <label for="f-dbrefY">DBRef Y (Hochwert)</label>
+                <input type="text" id="f-dbrefY" placeholder="optional" inputmode="decimal">
+              </div>
+            </div>
+            <div class="form-group" style="max-width:50%">
+              <label for="f-gkZone">GK-Zone</label>
+              <select id="f-gkZone">
+                <option value="">-- automatisch --</option>
+                <option value="1">Zone 1 (EPSG:5681)</option>
+                <option value="2">Zone 2 (EPSG:5682)</option>
+                <option value="3">Zone 3 (EPSG:5683)</option>
+                <option value="4">Zone 4 (EPSG:5684)</option>
+                <option value="5">Zone 5 (EPSG:5685)</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- Fotos -->
+        <section class="form-section" data-section="fotos">
+          <div class="section-header" onclick="App.toggleSection(this)">
+            <h2>Fotos <span id="photo-count">(0/5)</span></h2>
+            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="section-body">
+            <div id="photo-grid" class="photo-grid">
+              <!-- 5 photo slots -->
+              <div class="photo-slot" data-slot="1" onclick="App.capturePhoto(1)">
+                <div class="photo-placeholder">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span>Foto 1</span>
+                </div>
+                <img class="photo-preview" style="display:none">
+                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(1)" style="display:none">&times;</button>
+              </div>
+              <div class="photo-slot" data-slot="2" onclick="App.capturePhoto(2)">
+                <div class="photo-placeholder">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span>Foto 2</span>
+                </div>
+                <img class="photo-preview" style="display:none">
+                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(2)" style="display:none">&times;</button>
+              </div>
+              <div class="photo-slot" data-slot="3" onclick="App.capturePhoto(3)">
+                <div class="photo-placeholder">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span>Foto 3</span>
+                </div>
+                <img class="photo-preview" style="display:none">
+                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(3)" style="display:none">&times;</button>
+              </div>
+              <div class="photo-slot" data-slot="4" onclick="App.capturePhoto(4)">
+                <div class="photo-placeholder">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span>Foto 4</span>
+                </div>
+                <img class="photo-preview" style="display:none">
+                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(4)" style="display:none">&times;</button>
+              </div>
+              <div class="photo-slot" data-slot="5" onclick="App.capturePhoto(5)">
+                <div class="photo-placeholder">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span>Foto 5</span>
+                </div>
+                <img class="photo-preview" style="display:none">
+                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(5)" style="display:none">&times;</button>
+              </div>
+            </div>
+            <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="App.onPhotoSelected(event)">
+          </div>
+        </section>
+
+        <!-- Bemerkungen -->
+        <section class="form-section" data-section="bemerkungen">
+          <div class="section-header" onclick="App.toggleSection(this)">
+            <h2>Bemerkungen</h2>
+            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="section-body">
+            <div class="form-group">
+              <textarea id="f-bemerkungen" rows="3" placeholder="Optionale Bemerkungen..."></textarea>
+            </div>
+          </div>
+        </section>
+
+      </form>
+    </main>
+  </div>
+
+  <!-- ========== DIALOGS ========== -->
+  <div id="dialog-overlay" class="dialog-overlay" style="display:none" onclick="App.closeDialog()">
+    <div class="dialog" onclick="event.stopPropagation()">
+      <div id="dialog-content"></div>
+    </div>
+  </div>
+
+  <!-- ========== TOAST ========== -->
+  <div id="toast" class="toast" style="display:none"></div>
+
+  <!-- ========== LOADING SPINNER ========== -->
+  <div id="loading" class="loading-overlay" style="display:none">
+    <div class="spinner"></div>
+    <p id="loading-text">Wird verarbeitet...</p>
+  </div>
+
+  <!-- External dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/proj4@2.9.2/dist/proj4.js"></script>
+
+  <!-- App scripts -->
+  <script src="js/db.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
