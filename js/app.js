@@ -1210,20 +1210,62 @@ const App = (() => {
     try {
       let text = await file.text();
 
-      // Strip BOM and any non-JSON prefix (Outlook/OneDrive may prepend metadata)
-      text = text.replace(/^\uFEFF/, ''); // UTF-8 BOM
-      const jsonStart = text.indexOf('{');
-      if (jsonStart > 0) {
-        console.warn(`GeoJSON: skipping ${jsonStart} leading bytes of non-JSON data`);
-        text = text.substring(jsonStart);
-      }
-      // Also trim trailing garbage after last }
-      const jsonEnd = text.lastIndexOf('}');
-      if (jsonEnd >= 0 && jsonEnd < text.length - 1) {
-        text = text.substring(0, jsonEnd + 1);
-      }
+      // Strip BOM
+      text = text.replace(/^\uFEFF/, '');
 
-      const geojson = JSON.parse(text);
+      // Outlook/OneDrive can wrap files in binary TNEF or prepend metadata.
+      // Find the actual JSON object by searching for {"type" which starts every GeoJSON.
+      // Try progressively: first raw text, then search for JSON signature.
+      let geojson;
+      try {
+        geojson = JSON.parse(text);
+      } catch (_firstErr) {
+        // Search for the GeoJSON signature in the text
+        const sig = '{"type"';
+        let jsonStart = text.indexOf(sig);
+        if (jsonStart < 0) {
+          // Try with single quotes or flexible whitespace
+          jsonStart = text.indexOf('"type"');
+          if (jsonStart > 0) jsonStart = text.lastIndexOf('{', jsonStart);
+        }
+
+        if (jsonStart < 0) {
+          // Last resort: scan raw bytes for ASCII JSON start
+          const buf = await file.arrayBuffer();
+          const bytes = new Uint8Array(buf);
+          // Search for byte sequence: 7B 22 74 79 70 65 22 = {"type"
+          const needle = [0x7B, 0x22, 0x74, 0x79, 0x70, 0x65, 0x22];
+          for (let i = 0; i < bytes.length - needle.length; i++) {
+            let match = true;
+            for (let j = 0; j < needle.length; j++) {
+              if (bytes[i + j] !== needle[j]) { match = false; break; }
+            }
+            if (match) {
+              // Decode from this position onwards as UTF-8
+              text = new TextDecoder('utf-8').decode(bytes.slice(i));
+              jsonStart = 0;
+              break;
+            }
+          }
+        }
+
+        if (jsonStart < 0) {
+          throw new Error('Kein gültiges GeoJSON in der Datei gefunden. Möglicherweise ist die Datei binär verpackt (Outlook/OneDrive).');
+        }
+
+        if (jsonStart > 0) {
+          console.warn(`GeoJSON: skipping ${jsonStart} bytes of non-JSON data`);
+          text = text.substring(jsonStart);
+        }
+
+        // Trim trailing garbage after last }
+        const jsonEnd = text.lastIndexOf('}');
+        if (jsonEnd >= 0 && jsonEnd < text.length - 1) {
+          text = text.substring(0, jsonEnd + 1);
+        }
+
+        geojson = JSON.parse(text);
+      }
 
       if (geojson.type !== 'FeatureCollection' || !Array.isArray(geojson.features)) {
         throw new Error('Keine gültige GeoJSON FeatureCollection');
