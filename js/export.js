@@ -48,6 +48,25 @@ const ExportService = (() => {
     }
   }
 
+  /**
+   * Inverse transform: DB-Ref Gauß-Krüger → WGS84.
+   * Zone is auto-detected from the Rechtswert prefix digit.
+   */
+  function dbRefGkToWgs84(rechtswert, hochwert) {
+    if (typeof proj4 === 'undefined') return null;
+    _initProj4();
+    try {
+      const zone = Math.floor(rechtswert / 1000000);
+      if (zone < 1 || zone > 5) return null;
+      const epsg = `EPSG:${5680 + zone}`;
+      const result = proj4(epsg, 'EPSG:4326', [rechtswert, hochwert]);
+      return { longitude: result[0], latitude: result[1], zone };
+    } catch (e) {
+      console.warn('Inverse GK transform failed:', e);
+      return null;
+    }
+  }
+
   // ==================== CSV HELPERS ====================
 
   function _esc(value) {
@@ -469,5 +488,6 @@ const ExportService = (() => {
   return {
     exportUnified, exportCSVWithPhotos, exportGeoJSON, exportDbExcel,
     canNativeShare, shareFile, downloadFile,
+    dbRefGkToWgs84,
   };
 })();

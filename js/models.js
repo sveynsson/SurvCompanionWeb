@@ -171,6 +171,11 @@ const Models = (() => {
   /**
    * Art types that support GNSS tauglichkeit.
    */
+  const ImportStatus = {
+    offen:    { name: 'offen',    displayName: 'Offen' },
+    erledigt: { name: 'erledigt', displayName: 'Erledigt' },
+  };
+
   const GNSS_ARTS = ['ps0', 'ps1', 'ps2', 'tp', 'lhp'];
 
   /**
@@ -193,6 +198,7 @@ const Models = (() => {
     PS4Vermarkungsart, PS4GvBolzenTraeger, PS4MessmarkeTraeger,
     PS4AllgemeinerTraeger, PS4RammschieneTraeger, PS4GvBolzenLaenge, TargetZustand,
     LhpTpVermarkungsart, LhpTpVermarkungstraeger,
+    ImportStatus,
     displayName, enumOptions, GNSS_ARTS, GIC_TO_ART,
   };
 })();

@@ -256,19 +256,32 @@ const App = (() => {
       }
       empty.style.display = 'none';
 
-      points.sort((a, b) => new Date(b.erfassungsdatum) - new Date(a.erfassungsdatum));
+      // Sort: imported-offen first, then by date descending
+      points.sort((a, b) => {
+        const aOffen = a.importStatus === 'offen' ? 0 : 1;
+        const bOffen = b.importStatus === 'offen' ? 0 : 1;
+        if (aOffen !== bOffen) return aOffen - bOffen;
+        return new Date(b.erfassungsdatum) - new Date(a.erfassungsdatum);
+      });
 
       let html = '';
       for (const p of points) {
         const photoCount = [p.foto1, p.foto2, p.foto3, p.foto4, p.foto5].filter(Boolean).length;
         const date = new Date(p.erfassungsdatum).toLocaleDateString('de-DE');
         const station = p.station != null ? ` km ${p.station}` : '';
+        const importClass = p.importStatus ? ` import-${p.importStatus}` : '';
+        const importBadge = p.importStatus === 'offen'
+          ? '<span class="badge badge-import-offen">OFFEN</span>'
+          : p.importStatus === 'erledigt'
+          ? '<span class="badge badge-import-erledigt">ERLEDIGT</span>'
+          : '';
         html += `
-          <div class="list-item" onclick="App.editPoint('${_escAttr(p.punktId)}')">
+          <div class="list-item${importClass}" onclick="App.editPoint('${_escAttr(p.punktId)}')">
             <div class="list-item-content">
               <div class="list-item-title">
                 <span class="badge badge-${p.art}">${Models.displayName(Models.PunktArt, p.art)}</span>
                 ${_escHtml(p.punktId)}
+                ${importBadge}
               </div>
               <div class="list-item-subtitle">
                 Str. ${_escHtml(p.strecke)}${station} &middot; ${_escHtml(Models.displayName(Models.Seite, p.seite))} &middot; ${date}
@@ -485,6 +498,14 @@ const App = (() => {
       // Photo flags
       for (let slot = 1; slot <= 5; slot++) {
         pointData[`foto${slot}`] = _photoBlobs[slot] ? true : null;
+      }
+
+      // Import tracking: mark as erledigt on save, preserve import origin
+      if (_editingPoint?.importStatus) {
+        pointData.importStatus = 'erledigt';
+      }
+      if (_editingPoint?.importQuelle) {
+        pointData.importQuelle = _editingPoint.importQuelle;
       }
 
       // Art-specific fields
@@ -995,6 +1016,143 @@ const App = (() => {
     }
   }
 
+  // ==================== GEOJSON IMPORT ====================
+
+  function triggerImport() {
+    document.getElementById('geojson-input').value = '';
+    document.getElementById('geojson-input').click();
+  }
+
+  async function onGeoJsonSelected(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    showLoading('GeoJSON wird eingelesen...');
+    try {
+      const text = await file.text();
+      const geojson = JSON.parse(text);
+
+      if (geojson.type !== 'FeatureCollection' || !Array.isArray(geojson.features)) {
+        throw new Error('Keine gültige GeoJSON FeatureCollection');
+      }
+
+      if (geojson.features.length === 0) {
+        hideLoading();
+        showToast('Keine Features in der Datei', 'error');
+        return;
+      }
+
+      // Auto-detect dynamic property prefix (find key ending with _Strecke, _Target, etc.)
+      const sampleProps = geojson.features[0].properties || {};
+      let prefix = '';
+      for (const key of Object.keys(sampleProps)) {
+        const suffixes = ['_Strecke', '_Target', '_Bohrung', '_Foto', '_Bemerkung'];
+        for (const suf of suffixes) {
+          if (key.endsWith(suf)) {
+            prefix = key.slice(0, -suf.length);
+            break;
+          }
+        }
+        if (prefix) break;
+      }
+
+      const presets = _getPresets();
+      let imported = 0;
+      let skipped = 0;
+
+      for (const feature of geojson.features) {
+        const props = feature.properties || {};
+        const mastnummer = String(props.field_1 || '').trim();
+        if (!mastnummer) { skipped++; continue; }
+
+        const punktId = mastnummer;
+
+        // Skip duplicates
+        const existing = await DB.getPoint(punktId);
+        if (existing) { skipped++; continue; }
+
+        // Coordinates: use field_2/field_3 (GK) or geometry
+        let rechtswert = parseFloat(props.field_2);
+        let hochwert = parseFloat(props.field_3);
+        const hoehe = parseFloat(props.field_4) || null;
+
+        // Fallback to geometry coordinates
+        if ((!rechtswert || !hochwert) && feature.geometry?.coordinates) {
+          rechtswert = feature.geometry.coordinates[0];
+          hochwert = feature.geometry.coordinates[1];
+        }
+
+        // Convert GK → WGS84
+        let latitude = null, longitude = null, gkZone = null;
+        if (rechtswert && hochwert) {
+          const wgs = ExportService.dbRefGkToWgs84(rechtswert, hochwert);
+          if (wgs) {
+            latitude = wgs.latitude;
+            longitude = wgs.longitude;
+            gkZone = wgs.zone;
+          }
+        }
+
+        // Extract properties via detected prefix
+        const pStrecke = prefix ? props[`${prefix}_Strecke`] : null;
+        const pTarget = prefix ? props[`${prefix}_Target`] : null;
+        const pBemerkung = prefix ? props[`${prefix}_Bemerkung`] : null;
+
+        const strecke = String(pStrecke || presets.strecke || '');
+        const gicCode = String(props.field_5 || presets.gicCode || '');
+        const art = Models.GIC_TO_ART[parseInt(gicCode)] || presets.art || 'ps4';
+
+        // Build bemerkungen from import data
+        const bemParts = [];
+        if (pBemerkung) bemParts.push(pBemerkung);
+        const bemerkungen = bemParts.join('; ') || null;
+
+        const pointData = {
+          punktId,
+          projektNummer: _currentProject,
+          art,
+          strecke,
+          gicCode: gicCode || null,
+          ps4MastNummer: mastnummer,
+          erfassungsdatum: new Date().toISOString(),
+          erfasser: presets.erfasser || '',
+          seite: 'rechts',
+          neuOderBestand: 'bestandspunkt',
+          status: 'intakt',
+          rilKonformitaet: 'konform',
+          einmessskizze: 'nein',
+          gpsLatitude: latitude,
+          gpsLongitude: longitude,
+          hoehe,
+          dbrefX: rechtswert || null,
+          dbrefY: hochwert || null,
+          gkZone,
+          bemerkungen,
+          importStatus: 'offen',
+          importQuelle: file.name,
+        };
+
+        // Pre-set target vorhanden if indicated in import data or preset
+        if (pTarget === 'J' || presets.targetVorhanden) {
+          pointData.ps4TargetVorhanden = true;
+        }
+
+        await DB.savePointWithPhotos(pointData, {});
+        imported++;
+      }
+
+      hideLoading();
+      let msg = `${imported} Punkt(e) importiert`;
+      if (skipped > 0) msg += `, ${skipped} übersprungen (Duplikate)`;
+      showToast(msg, 'success');
+      await showPoints();
+    } catch (e) {
+      hideLoading();
+      console.error('Import failed:', e);
+      showToast('Import fehlgeschlagen: ' + e.message, 'error');
+    }
+  }
+
   // ==================== SECTIONS ====================
 
   function toggleSection(headerEl) {
@@ -1243,6 +1401,8 @@ const App = (() => {
     showDialog, closeDialog, showToast,
     // Presets
     togglePresets, savePresets,
+    // Import
+    triggerImport, onGeoJsonSelected,
     // Internal (exposed for dialog callback)
     _doCancel,
   };

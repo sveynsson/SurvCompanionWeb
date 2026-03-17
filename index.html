@@ -36,10 +36,14 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <h1 id="points-title">Punkte</h1>
+      <button class="icon-btn" onclick="App.triggerImport()" title="GeoJSON Import">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </button>
       <button class="icon-btn" onclick="App.showExportDialog()" title="Export">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       </button>
     </header>
+    <input type="file" id="geojson-input" accept=".geojson,.json" style="display:none" onchange="App.onGeoJsonSelected(event)">
     <main class="content">
       <!-- Voreinstellungen -->
       <div id="presets-panel" class="presets-panel">
