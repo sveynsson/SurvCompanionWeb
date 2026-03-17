@@ -270,12 +270,18 @@ const App = (() => {
   function applyFilters() {
     const filterArt = document.getElementById('filter-art')?.value || '';
     const filterStrecke = (document.getElementById('filter-strecke')?.value || '').trim().toLowerCase();
+    const filterGic = (document.getElementById('filter-gic')?.value || '').trim();
     const filterImport = document.getElementById('filter-import')?.value || '';
     const kmGroup = document.getElementById('filter-km-group')?.checked || false;
 
     _filteredPoints = _allPoints.filter(p => {
-      if (filterArt && p.art !== filterArt) return false;
+      // Art filter: also match if the point's GIC code maps to the filtered art
+      if (filterArt) {
+        const gicArt = p.gicCode ? Models.GIC_TO_ART[parseInt(p.gicCode)] : null;
+        if (p.art !== filterArt && gicArt !== filterArt) return false;
+      }
       if (filterStrecke && !(p.strecke || '').toLowerCase().includes(filterStrecke)) return false;
+      if (filterGic && !(p.gicCode || '').includes(filterGic)) return false;
       if (filterImport === 'offen' && p.importStatus !== 'offen') return false;
       if (filterImport === 'erledigt' && p.importStatus !== 'erledigt') return false;
       if (filterImport === 'none' && p.importStatus) return false;
