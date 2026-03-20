@@ -409,12 +409,13 @@ const ExportService = (() => {
   /**
    * Builds the ZIP blob and returns { blob, filename } for the caller
    * to decide how to deliver (share vs download).
+   * Uses STORE (no compression) to reduce memory usage on iOS Safari —
+   * photos are already JPEG-compressed, so DEFLATE gains almost nothing.
    */
   async function _buildZip(zip, filename) {
     const blob = await zip.generateAsync({
       type: 'blob',
-      compression: 'DEFLATE',
-      compressionOptions: { level: 6 },
+      compression: 'STORE',
     });
     return { blob, filename };
   }

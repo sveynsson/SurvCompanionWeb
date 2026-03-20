@@ -1235,7 +1235,7 @@ const App = (() => {
           await DB.deleteProject(projekt);
           hideLoading();
           showToast(`Projekt ${projekt} gelöscht — Speicher freigegeben`, 'success');
-          await showProjectList();
+          await showProjects();
         } catch (e) {
           hideLoading();
           console.error('Delete after export failed:', e);
