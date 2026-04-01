@@ -36,7 +36,6 @@ const ExportService = (() => {
    * Supported EPSG codes for CSV import, grouped for display.
    */
   const IMPORT_CRS_OPTIONS = [
-    { value: 'auto',       label: 'Automatisch – DB-Ref GK (Zone aus Rechtswert)' },
     { value: 'EPSG:5681',  label: 'EPSG:5681 – DB-Ref GK Zone 1 (Meridian 3°)' },
     { value: 'EPSG:5682',  label: 'EPSG:5682 – DB-Ref GK Zone 2 (Meridian 6°)' },
     { value: 'EPSG:5683',  label: 'EPSG:5683 – DB-Ref GK Zone 3 (Meridian 9°)' },
@@ -62,15 +61,8 @@ const ExportService = (() => {
     if (typeof proj4 === 'undefined') return null;
     _initProj4();
     try {
-      let srcEpsg = epsg;
-      if (epsg === 'auto') {
-        const zone = Math.floor(rechtswert / 1000000);
-        if (zone < 1 || zone > 5) return null;
-        srcEpsg = `EPSG:${5680 + zone}`;
-      }
-      const result = proj4(srcEpsg, 'EPSG:4326', [rechtswert, hochwert]);
-      const zone = epsg === 'auto' ? Math.floor(rechtswert / 1000000) : null;
-      return { longitude: result[0], latitude: result[1], zone };
+      const result = proj4(epsg, 'EPSG:4326', [rechtswert, hochwert]);
+      return { longitude: result[0], latitude: result[1], zone: null };
     } catch (e) {
       console.warn('coordToWgs84 failed:', e);
       return null;
