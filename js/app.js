@@ -1300,11 +1300,14 @@ const App = (() => {
     document.getElementById('csv-input').click();
   }
 
+  // Stores parsed CSV state between file-read and dialog confirmation
+  let _pendingCsv = null;
+
   async function onCsvSelected(event) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    showLoading('CSV wird eingelesen...');
+    showLoading('CSV wird gelesen...');
     try {
       const text = await file.text();
       const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
@@ -1316,6 +1319,67 @@ const App = (() => {
       const firstCells = (lines[0] || '').split(sep).map(c => c.trim().replace(/^["']|["']$/g, ''));
       const startRow = (firstCells[0] && isNaN(parseFloat(firstCells[0]))) ? 1 : 0;
 
+      // Count non-empty data rows for preview
+      const dataRows = lines.slice(startRow).filter(l => l.trim()).length;
+
+      _pendingCsv = { file, lines, sep, startRow };
+      hideLoading();
+
+      // Build EPSG option list from ExportService
+      const epsgOptions = ExportService.IMPORT_CRS_OPTIONS
+        .map(o => `<option value="${o.value}">${o.label}</option>`)
+        .join('');
+
+      const html = `
+        <h3>CSV Import Einstellungen</h3>
+        <p class="confirm-text"><strong>${dataRows}</strong> Datensatz/Datensätze gefunden in <em>${_escHtml(file.name)}</em></p>
+        <div class="form-group" style="margin-top:12px">
+          <label>Spaltenformat (erwartet)</label>
+          <div style="font-size:0.85em;color:var(--on-surface-secondary);font-family:monospace;padding:6px 8px;background:var(--surface-variant,#f0f0f0);border-radius:4px">
+            Pktnr, Hochwert, Rechtswert, Höhe, Code
+          </div>
+        </div>
+        <div class="checkbox-group" style="margin:12px 0 4px">
+          <input type="checkbox" id="d-csv-coords" checked onchange="App._onCsvCoordToggle()">
+          <label for="d-csv-coords">Koordinaten importieren</label>
+        </div>
+        <div class="form-group" id="d-csv-epsg-group">
+          <label for="d-csv-epsg">Koordinatensystem</label>
+          <select id="d-csv-epsg">${epsgOptions}</select>
+        </div>
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn btn-secondary" onclick="App.closeDialog()">Abbrechen</button>
+          <button class="btn btn-primary" onclick="App._confirmCsvImport()">Importieren</button>
+        </div>`;
+      showDialog(html);
+    } catch (e) {
+      hideLoading();
+      console.error('CSV read failed:', e);
+      showToast('CSV-Datei konnte nicht gelesen werden: ' + e.message, 'error');
+    }
+  }
+
+  function _onCsvCoordToggle() {
+    const checked = document.getElementById('d-csv-coords')?.checked;
+    const group = document.getElementById('d-csv-epsg-group');
+    if (group) group.style.opacity = checked ? '1' : '0.4';
+    const sel = document.getElementById('d-csv-epsg');
+    if (sel) sel.disabled = !checked;
+  }
+
+  async function _confirmCsvImport() {
+    if (!_pendingCsv) return;
+    const importCoords = document.getElementById('d-csv-coords')?.checked ?? true;
+    const epsg = document.getElementById('d-csv-epsg')?.value || 'auto';
+    const { file, lines, sep, startRow } = _pendingCsv;
+    _pendingCsv = null;
+    closeDialog();
+    await _doCsvImport(file, lines, sep, startRow, importCoords, epsg);
+  }
+
+  async function _doCsvImport(file, lines, sep, startRow, importCoords, epsg) {
+    showLoading('CSV wird importiert...');
+    try {
       const presets = _getPresets();
       let imported = 0, skipped = 0;
 
@@ -1337,11 +1401,11 @@ const App = (() => {
         const hoehe      = cells.length > 3 ? parseFloat(cells[3]) : NaN;
         const code       = cells.length > 4 ? cells[4].trim() : '';
 
-        const hasCoords = !isNaN(rechtswert) && !isNaN(hochwert) && rechtswert > 0 && hochwert > 0;
+        const hasRawCoords = !isNaN(rechtswert) && !isNaN(hochwert);
 
         let latitude = null, longitude = null, gkZone = null;
-        if (hasCoords) {
-          const wgs = ExportService.dbRefGkToWgs84(rechtswert, hochwert);
+        if (importCoords && hasRawCoords) {
+          const wgs = ExportService.coordToWgs84(rechtswert, hochwert, epsg);
           if (wgs) {
             latitude  = wgs.latitude;
             longitude = wgs.longitude;
@@ -1355,27 +1419,28 @@ const App = (() => {
           : (presets.art || 'ps4');
 
         const pointData = {
-          punktId:        pktnr,
-          projektNummer:  _currentProject,
+          punktId:         pktnr,
+          projektNummer:   _currentProject,
           art,
-          strecke:        presets.strecke || '',
-          gicCode:        gicCode || null,
+          strecke:         presets.strecke || '',
+          gicCode:         gicCode || null,
           erfassungsdatum: new Date().toISOString(),
-          erfasser:       presets.erfasser || '',
-          seite:          'rechts',
-          neuOderBestand: 'bestandspunkt',
-          status:         'intakt',
+          erfasser:        presets.erfasser || '',
+          seite:           'rechts',
+          neuOderBestand:  'bestandspunkt',
+          status:          'intakt',
           rilKonformitaet: 'ja',
-          einmessskizze:  'nichtVorhanden',
-          gpsLatitude:    latitude,
-          gpsLongitude:   longitude,
-          hoehe:          !isNaN(hoehe) ? hoehe : null,
-          dbrefX:         hasCoords ? rechtswert : null,
-          dbrefY:         hasCoords ? hochwert   : null,
+          einmessskizze:   'nichtVorhanden',
+          gpsLatitude:     latitude,
+          gpsLongitude:    longitude,
+          hoehe:           !isNaN(hoehe) ? hoehe : null,
+          dbrefX:          (importCoords && hasRawCoords) ? rechtswert : null,
+          dbrefY:          (importCoords && hasRawCoords) ? hochwert   : null,
           gkZone,
-          importStatus:   'offen',
-          importQuelle:   file.name,
-          csvKoordinaten: hasCoords,
+          importStatus:    'offen',
+          importQuelle:    file.name,
+          csvKoordinaten:  importCoords && hasRawCoords,
+          csvEpsg:         importCoords && hasRawCoords ? epsg : null,
         };
 
         await DB.savePointWithPhotos(pointData, {});
@@ -1831,6 +1896,7 @@ const App = (() => {
     // Import
     triggerImport, _triggerGeoJsonImport, _triggerCsvImport,
     onGeoJsonSelected, onCsvSelected,
+    _onCsvCoordToggle, _confirmCsvImport,
     _doCaptureGPS,
     // Filters, pagination, grouping
     applyFilters, prevPage, nextPage, toggleKmGroup,

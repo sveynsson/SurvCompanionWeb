@@ -13,16 +13,67 @@ const ExportService = (() => {
 
   function _initProj4() {
     if (typeof proj4 === 'undefined') return;
-    const towgs84 = '+towgs84=598.1,73.7,418.2,0.202,0.045,-2.455,6.7';
+    const towgs84Bessel = '+towgs84=598.1,73.7,418.2,0.202,0.045,-2.455,6.7';
     const defs = {
-      'EPSG:5681': `+proj=tmerc +lat_0=0 +lon_0=3 +k=1 +x_0=1500000 +y_0=0 +ellps=bessel ${towgs84} +units=m +no_defs`,
-      'EPSG:5682': `+proj=tmerc +lat_0=0 +lon_0=6 +k=1 +x_0=2500000 +y_0=0 +ellps=bessel ${towgs84} +units=m +no_defs`,
-      'EPSG:5683': `+proj=tmerc +lat_0=0 +lon_0=9 +k=1 +x_0=3500000 +y_0=0 +ellps=bessel ${towgs84} +units=m +no_defs`,
-      'EPSG:5684': `+proj=tmerc +lat_0=0 +lon_0=12 +k=1 +x_0=4500000 +y_0=0 +ellps=bessel ${towgs84} +units=m +no_defs`,
-      'EPSG:5685': `+proj=tmerc +lat_0=0 +lon_0=15 +k=1 +x_0=5500000 +y_0=0 +ellps=bessel ${towgs84} +units=m +no_defs`,
+      // DB-Ref Gauß-Krüger (Bessel ellipsoid)
+      'EPSG:5681': `+proj=tmerc +lat_0=0 +lon_0=3  +k=1 +x_0=1500000 +y_0=0 +ellps=bessel ${towgs84Bessel} +units=m +no_defs`,
+      'EPSG:5682': `+proj=tmerc +lat_0=0 +lon_0=6  +k=1 +x_0=2500000 +y_0=0 +ellps=bessel ${towgs84Bessel} +units=m +no_defs`,
+      'EPSG:5683': `+proj=tmerc +lat_0=0 +lon_0=9  +k=1 +x_0=3500000 +y_0=0 +ellps=bessel ${towgs84Bessel} +units=m +no_defs`,
+      'EPSG:5684': `+proj=tmerc +lat_0=0 +lon_0=12 +k=1 +x_0=4500000 +y_0=0 +ellps=bessel ${towgs84Bessel} +units=m +no_defs`,
+      'EPSG:5685': `+proj=tmerc +lat_0=0 +lon_0=15 +k=1 +x_0=5500000 +y_0=0 +ellps=bessel ${towgs84Bessel} +units=m +no_defs`,
+      // UTM / ETRS89 (GRS80 ellipsoid ≈ WGS84)
+      'EPSG:25831': '+proj=utm +zone=31 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs',
+      'EPSG:25832': '+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs',
+      'EPSG:25833': '+proj=utm +zone=33 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs',
+      'EPSG:25834': '+proj=utm +zone=34 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs',
     };
     for (const [code, def] of Object.entries(defs)) {
       try { proj4.defs(code, def); } catch (e) { /* already defined */ }
+    }
+  }
+
+  /**
+   * Supported EPSG codes for CSV import, grouped for display.
+   */
+  const IMPORT_CRS_OPTIONS = [
+    { value: 'auto',       label: 'Automatisch – DB-Ref GK (Zone aus Rechtswert)' },
+    { value: 'EPSG:5681',  label: 'EPSG:5681 – DB-Ref GK Zone 1 (Meridian 3°)' },
+    { value: 'EPSG:5682',  label: 'EPSG:5682 – DB-Ref GK Zone 2 (Meridian 6°)' },
+    { value: 'EPSG:5683',  label: 'EPSG:5683 – DB-Ref GK Zone 3 (Meridian 9°)' },
+    { value: 'EPSG:5684',  label: 'EPSG:5684 – DB-Ref GK Zone 4 (Meridian 12°)' },
+    { value: 'EPSG:5685',  label: 'EPSG:5685 – DB-Ref GK Zone 5 (Meridian 15°)' },
+    { value: 'EPSG:25831', label: 'EPSG:25831 – UTM Zone 31N (ETRS89)' },
+    { value: 'EPSG:25832', label: 'EPSG:25832 – UTM Zone 32N (ETRS89)' },
+    { value: 'EPSG:25833', label: 'EPSG:25833 – UTM Zone 33N (ETRS89)' },
+    { value: 'EPSG:25834', label: 'EPSG:25834 – UTM Zone 34N (ETRS89)' },
+    { value: 'EPSG:4326',  label: 'EPSG:4326 – WGS84 (Breiten-/Längengrad)' },
+  ];
+
+  /**
+   * General coordinate transform: (Rechtswert/X, Hochwert/Y) in given CRS → WGS84.
+   * epsg: one of the values in IMPORT_CRS_OPTIONS, or 'auto'.
+   * Returns { latitude, longitude, zone } or null on failure.
+   */
+  function coordToWgs84(rechtswert, hochwert, epsg) {
+    if (epsg === 'EPSG:4326') {
+      // Already WGS84: Hochwert = latitude, Rechtswert = longitude
+      return { latitude: hochwert, longitude: rechtswert, zone: null };
+    }
+    if (typeof proj4 === 'undefined') return null;
+    _initProj4();
+    try {
+      let srcEpsg = epsg;
+      if (epsg === 'auto') {
+        const zone = Math.floor(rechtswert / 1000000);
+        if (zone < 1 || zone > 5) return null;
+        srcEpsg = `EPSG:${5680 + zone}`;
+      }
+      const result = proj4(srcEpsg, 'EPSG:4326', [rechtswert, hochwert]);
+      const zone = epsg === 'auto' ? Math.floor(rechtswert / 1000000) : null;
+      return { longitude: result[0], latitude: result[1], zone };
+    } catch (e) {
+      console.warn('coordToWgs84 failed:', e);
+      return null;
     }
   }
 
@@ -475,5 +526,7 @@ const ExportService = (() => {
     exportUnified, exportCSVWithPhotos, exportGeoJSON, exportDbExcel,
     canNativeShare, shareFile, downloadFile,
     dbRefGkToWgs84,
+    coordToWgs84,
+    IMPORT_CRS_OPTIONS,
   };
 })();
