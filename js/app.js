@@ -686,6 +686,9 @@ const App = (() => {
       if (_editingPoint?.importQuelle) {
         pointData.importQuelle = _editingPoint.importQuelle;
       }
+      if (_editingPoint?.csvKoordinaten) {
+        pointData.csvKoordinaten = _editingPoint.csvKoordinaten;
+      }
 
       // Art-specific fields
       _readArtSpecificFields(pointData, art);
@@ -1047,6 +1050,29 @@ const App = (() => {
       showToast('GPS nicht verfügbar in diesem Browser', 'error');
       return;
     }
+
+    // CSV-imported coordinates are considered higher quality than phone GPS.
+    // Warn the user before overwriting them.
+    const hasImportCoords = _editingPoint?.csvKoordinaten &&
+      (document.getElementById('f-gpsLatitude').value ||
+       document.getElementById('f-gpsLongitude').value);
+
+    if (hasImportCoords) {
+      const html = `
+        <h3>Koordinaten überschreiben?</h3>
+        <p class="confirm-text">Dieser Punkt hat bereits Koordinaten aus dem CSV-Import. Diese gelten als höherwertig als eine Handy-GPS-Messung.</p>
+        <p>Wirklich mit Handy-GPS überschreiben?</p>
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="App.closeDialog()">Abbrechen</button>
+          <button class="btn btn-danger" onclick="App.closeDialog();App._doCaptureGPS()">GPS verwenden</button>
+        </div>`;
+      showDialog(html);
+    } else {
+      _doCaptureGPS();
+    }
+  }
+
+  function _doCaptureGPS() {
     showToast('GPS wird erfasst...');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -1245,11 +1271,127 @@ const App = (() => {
     }, 500);
   }
 
-  // ==================== GEOJSON IMPORT ====================
+  // ==================== IMPORT ====================
 
   function triggerImport() {
+    const html = `
+      <h3>Import</h3>
+      <div class="export-option" onclick="App.closeDialog();App._triggerGeoJsonImport()">
+        <h4>GeoJSON importieren</h4>
+        <p>GeoJSON-Datei mit Punktdaten einlesen</p>
+      </div>
+      <div class="export-option" onclick="App.closeDialog();App._triggerCsvImport()">
+        <h4>CSV Punkte importieren</h4>
+        <p>CSV-Datei mit Pktnr, Hochwert, Rechtswert, Höhe, Code (GK-Koordinaten, Dezimaltrenner: Punkt)</p>
+      </div>
+      <div style="margin-top:16px">
+        <button class="btn btn-secondary btn-block" onclick="App.closeDialog()">Abbrechen</button>
+      </div>`;
+    showDialog(html);
+  }
+
+  function _triggerGeoJsonImport() {
     document.getElementById('geojson-input').value = '';
     document.getElementById('geojson-input').click();
+  }
+
+  function _triggerCsvImport() {
+    document.getElementById('csv-input').value = '';
+    document.getElementById('csv-input').click();
+  }
+
+  async function onCsvSelected(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    showLoading('CSV wird eingelesen...');
+    try {
+      const text = await file.text();
+      const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+
+      // Auto-detect separator (semicolon or comma)
+      const sep = (lines[0] || '').includes(';') ? ';' : ',';
+
+      // Skip header row if first cell is non-numeric
+      const firstCells = (lines[0] || '').split(sep).map(c => c.trim().replace(/^["']|["']$/g, ''));
+      const startRow = (firstCells[0] && isNaN(parseFloat(firstCells[0]))) ? 1 : 0;
+
+      const presets = _getPresets();
+      let imported = 0, skipped = 0;
+
+      for (let i = startRow; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const cells = line.split(sep).map(c => c.trim().replace(/^["']|["']$/g, ''));
+        const pktnr = cells[0];
+        if (!pktnr) continue;
+
+        // Skip duplicates
+        const existing = await DB.getPoint(pktnr);
+        if (existing) { skipped++; continue; }
+
+        // CSV columns: Pktnr, Hochwert(Y), Rechtswert(X), Höhe, Code
+        const hochwert   = cells.length > 1 ? parseFloat(cells[1]) : NaN;
+        const rechtswert = cells.length > 2 ? parseFloat(cells[2]) : NaN;
+        const hoehe      = cells.length > 3 ? parseFloat(cells[3]) : NaN;
+        const code       = cells.length > 4 ? cells[4].trim() : '';
+
+        const hasCoords = !isNaN(rechtswert) && !isNaN(hochwert) && rechtswert > 0 && hochwert > 0;
+
+        let latitude = null, longitude = null, gkZone = null;
+        if (hasCoords) {
+          const wgs = ExportService.dbRefGkToWgs84(rechtswert, hochwert);
+          if (wgs) {
+            latitude  = wgs.latitude;
+            longitude = wgs.longitude;
+            gkZone    = wgs.zone;
+          }
+        }
+
+        const gicCode = code || presets.gicCode || null;
+        const art = gicCode
+          ? (Models.GIC_TO_ART[parseInt(gicCode)] || presets.art || 'ps4')
+          : (presets.art || 'ps4');
+
+        const pointData = {
+          punktId:        pktnr,
+          projektNummer:  _currentProject,
+          art,
+          strecke:        presets.strecke || '',
+          gicCode:        gicCode || null,
+          erfassungsdatum: new Date().toISOString(),
+          erfasser:       presets.erfasser || '',
+          seite:          'rechts',
+          neuOderBestand: 'bestandspunkt',
+          status:         'intakt',
+          rilKonformitaet: 'ja',
+          einmessskizze:  'nichtVorhanden',
+          gpsLatitude:    latitude,
+          gpsLongitude:   longitude,
+          hoehe:          !isNaN(hoehe) ? hoehe : null,
+          dbrefX:         hasCoords ? rechtswert : null,
+          dbrefY:         hasCoords ? hochwert   : null,
+          gkZone,
+          importStatus:   'offen',
+          importQuelle:   file.name,
+          csvKoordinaten: hasCoords,
+        };
+
+        await DB.savePointWithPhotos(pointData, {});
+        imported++;
+      }
+
+      hideLoading();
+      let msg = `${imported} Punkt(e) aus CSV importiert`;
+      if (skipped > 0) msg += `, ${skipped} übersprungen (Duplikate)`;
+      showToast(msg, 'success');
+      await showPoints();
+    } catch (e) {
+      hideLoading();
+      console.error('CSV Import failed:', e);
+      showToast('CSV-Import fehlgeschlagen: ' + e.message, 'error');
+    }
   }
 
   async function onGeoJsonSelected(event) {
@@ -1687,7 +1829,9 @@ const App = (() => {
     // Presets
     togglePresets, savePresets,
     // Import
-    triggerImport, onGeoJsonSelected,
+    triggerImport, _triggerGeoJsonImport, _triggerCsvImport,
+    onGeoJsonSelected, onCsvSelected,
+    _doCaptureGPS,
     // Filters, pagination, grouping
     applyFilters, prevPage, nextPage, toggleKmGroup,
     // Internal (exposed for dialog callback)
