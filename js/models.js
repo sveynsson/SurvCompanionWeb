@@ -51,8 +51,10 @@ const Models = (() => {
 
   // PS0
   const PS0Vermarkungsart = {
-    dbAluMitId: { name: 'dbAluMitId', displayName: 'DB-Alu mit ID' },
-    andere:     { name: 'andere',     displayName: 'Andere' },
+    dbAluMitId:       { name: 'dbAluMitId',       displayName: 'DB-Alu mit ID' },
+    rundbolzenMitId:  { name: 'rundbolzenMitId',  displayName: 'Rundbolzen mit ID' },
+    flachbolzenMitId: { name: 'flachbolzenMitId', displayName: 'Flachbolzen mit ID' },
+    andere:           { name: 'andere',           displayName: 'Andere' },
   };
   const PS0Vermarkungstraeger = {
     bauwerk: { name: 'bauwerk', displayName: 'Bauwerk' },
@@ -61,18 +63,27 @@ const Models = (() => {
   };
 
   // PS1
+  const PS1Vermarkungsart = {
+    messingbolzen28mm: { name: 'messingbolzen28mm', displayName: 'Messingbolzen (\u00d8 \u2265 28 mm)' },
+    andere:            { name: 'andere',            displayName: 'Andere' },
+  };
   const PS1Vermarkungstraeger = {
-    bauwerk: { name: 'bauwerk', displayName: 'Bauwerk' },
-    beton:   { name: 'beton',   displayName: 'Beton' },
-    andere:  { name: 'andere',  displayName: 'Andere' },
+    bauwerk:       { name: 'bauwerk',       displayName: 'Bauwerk' },
+    beton:         { name: 'beton',         displayName: 'Beton' },
+    granitpfeiler: { name: 'granitpfeiler', displayName: 'Granitpfeiler' },
+    ortbeton:      { name: 'ortbeton',      displayName: 'Ortbeton' },
+    andere:        { name: 'andere',        displayName: 'Andere' },
   };
 
   // PS2
   const PS2Vermarkungsart = {
-    messmarke:                { name: 'messmarke',                displayName: 'Messmarke' },
-    nagel:                    { name: 'nagel',                    displayName: 'Nagel' },
-    kreuzankerMitGelberKappe: { name: 'kreuzankerMitGelberKappe', displayName: 'Kreuzanker mit gelber Kappe' },
-    attenberger:              { name: 'attenberger',              displayName: 'Attenberger' },
+    messmarke:                  { name: 'messmarke',                  displayName: 'Messmarke' },
+    nagel:                      { name: 'nagel',                      displayName: 'Nagel' },
+    kreuzankerMitGelberKappe:   { name: 'kreuzankerMitGelberKappe',   displayName: 'Kreuzanker mit gelber Kappe' },
+    attenberger:                { name: 'attenberger',                displayName: 'Attenberger' },
+    attenbergerMitHoehenmarke:  { name: 'attenbergerMitHoehenmarke',  displayName: 'Attenberger mit Höhenmarke' },
+    messingbolzenAufBauwerk:    { name: 'messingbolzenAufBauwerk',    displayName: 'Messingbolzen auf Bauwerk (3D)' },
+    messingbolzenAufFundament:  { name: 'messingbolzenAufFundament',  displayName: 'Messingbolzen auf Fundament (3D)' },
   };
   const PS2Vermarkungstraeger = {
     bauwerk: { name: 'bauwerk', displayName: 'Bauwerk' },
@@ -88,9 +99,13 @@ const Models = (() => {
     andere:       { name: 'andere',       displayName: 'Andere' },
   };
   const PS3Vermarkungstraeger = {
-    bauwerk: { name: 'bauwerk', displayName: 'Bauwerk' },
-    beton:   { name: 'beton',   displayName: 'Beton' },
-    andere:  { name: 'andere',  displayName: 'Andere' },
+    bauwerk:    { name: 'bauwerk',    displayName: 'Bauwerk' },
+    beton:      { name: 'beton',      displayName: 'Beton' },
+    eu:         { name: 'eu',         displayName: 'E\u00dc' },
+    widerlager: { name: 'widerlager', displayName: 'Widerlager' },
+    fundament:  { name: 'fundament',  displayName: 'Fundament' },
+    gebaeude:   { name: 'gebaeude',   displayName: 'Geb\u00e4ude' },
+    andere:     { name: 'andere',     displayName: 'Andere' },
   };
 
   // PS4
@@ -191,7 +206,7 @@ const Models = (() => {
     PunktArt, Seite, PunktStatus, PunktTyp, RilKonformitaet,
     GnssTauglichkeit, Einmessskizze,
     PS0Vermarkungsart, PS0Vermarkungstraeger,
-    PS1Vermarkungstraeger,
+    PS1Vermarkungsart, PS1Vermarkungstraeger,
     PS2Vermarkungsart, PS2Vermarkungstraeger,
     PS3Vermarkungsart, PS3Vermarkungstraeger,
     PS4Vermarkungsart, PS4GvBolzenTraeger, PS4MessmarkeTraeger,

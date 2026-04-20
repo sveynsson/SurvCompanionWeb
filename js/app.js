@@ -81,7 +81,7 @@ const App = (() => {
           <div class="list-item" onclick="App.selectProject('${_escAttr(proj.projektNummer)}')">
             <div class="list-item-content">
               <div class="list-item-title">${_escHtml(proj.bezeichnung || proj.projektNummer)}</div>
-              <div class="list-item-subtitle">${_escHtml(proj.projektNummer)} &middot; ${date}</div>
+              <div class="list-item-subtitle">${_escHtml(proj.projektNummer)} <span class="sep">&middot;</span> ${date}</div>
             </div>
             <span class="list-item-badge">${points.length}</span>
             <div class="list-item-actions">
@@ -469,8 +469,8 @@ const App = (() => {
             ${importBadge}
           </div>
           <div class="list-item-subtitle">
-            Str. ${_escHtml(p.strecke)}${station} &middot; ${_escHtml(Models.displayName(Models.Seite, p.seite))} &middot; ${date}
-            ${photoCount > 0 ? ' &middot; ' + photoCount + ' Foto(s)' : ''}
+            Str. ${_escHtml(p.strecke)}${station} <span class="sep">&middot;</span> ${_escHtml(Models.displayName(Models.Seite, p.seite))} <span class="sep">&middot;</span> ${date}
+            ${photoCount > 0 ? ' <span class="sep">&middot;</span> ' + photoCount + ' Foto(s)' : ''}
           </div>
         </div>
         <div class="list-item-actions">
@@ -772,7 +772,9 @@ const App = (() => {
              + _fieldText('ps0AndereVermarkungstraeger', 'Anderer Vermarkungsträger');
         break;
       case 'ps1':
-        html = _fieldSelect('ps1Vermarkungstraeger', 'Vermarkungsträger', Models.PS1Vermarkungstraeger)
+        html = _fieldSelect('ps1Vermarkungsart', 'Vermarkungsart', Models.PS1Vermarkungsart)
+             + _fieldSelect('ps1Vermarkungstraeger', 'Vermarkungsträger', Models.PS1Vermarkungstraeger)
+             + _fieldText('ps1AndereVermarkungsart', 'Andere Vermarkungsart')
              + _fieldText('ps1AndereVermarkungstraeger', 'Anderer Vermarkungsträger');
         break;
       case 'ps2':
@@ -1761,7 +1763,9 @@ const App = (() => {
         data.ps0AndereVermarkungstraeger = _v('f-ps0AndereVermarkungstraeger');
         break;
       case 'ps1':
+        data.ps1Vermarkungsart = _v('f-ps1Vermarkungsart');
         data.ps1Vermarkungstraeger = _v('f-ps1Vermarkungstraeger');
+        data.ps1AndereVermarkungsart = _v('f-ps1AndereVermarkungsart');
         data.ps1AndereVermarkungstraeger = _v('f-ps1AndereVermarkungstraeger');
         break;
       case 'ps2':
@@ -1812,7 +1816,9 @@ const App = (() => {
         _setVal('f-ps0AndereVermarkungstraeger', p.ps0AndereVermarkungstraeger);
         break;
       case 'ps1':
+        _setVal('f-ps1Vermarkungsart', p.ps1Vermarkungsart);
         _setVal('f-ps1Vermarkungstraeger', p.ps1Vermarkungstraeger);
+        _setVal('f-ps1AndereVermarkungsart', p.ps1AndereVermarkungsart);
         _setVal('f-ps1AndereVermarkungstraeger', p.ps1AndereVermarkungstraeger);
         break;
       case 'ps2':

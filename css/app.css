@@ -22,13 +22,29 @@
 
 html, body {
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
   font-size: 15px;
   line-height: 1.5;
   color: var(--on-surface);
   background: var(--background);
   -webkit-tap-highlight-color: transparent;
   overflow: hidden;
+  font-synthesis: none;
+}
+
+/* Force a sans-serif stack on all text so Samsung/OneUI custom system fonts
+   without full glyph coverage can't fall back to symbol fonts (Wingdings etc.). */
+body, button, input, select, textarea {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+}
+
+/* Inline separator for list subtitles. Explicit font stack guarantees the
+   middot glyph comes from a normal sans-serif, never from a symbol font. */
+.sep {
+  font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+  display: inline-block;
+  padding: 0 2px;
+  color: var(--on-surface-secondary);
 }
 
 /* ============ VIEWS ============ */
@@ -347,11 +363,11 @@ html, body {
   background: rgba(0,0,0,0.6);
   color: white;
   border: none;
-  font-size: 16px;
-  line-height: 24px;
-  text-align: center;
   cursor: pointer;
   padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ============ BUTTONS ============ */
