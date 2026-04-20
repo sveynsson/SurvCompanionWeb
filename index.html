@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#1565C0">
   <title>SurvCompanion Web</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -39,8 +40,8 @@
       <button class="icon-btn" onclick="App.triggerImport()" title="GeoJSON Import">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       </button>
-      <button class="icon-btn" onclick="App.showExportDialog()" title="Export">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <button class="icon-btn" onclick="App.showExportDialog()" title="Export / Speichern">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       </button>
     </header>
     <input type="file" id="geojson-input" accept=".geojson,.json" style="display:none" onchange="App.onGeoJsonSelected(event)">
@@ -92,7 +93,7 @@
       <!-- Filter & Ansicht -->
       <div class="filter-bar">
         <div class="filter-row">
-          <select id="filter-art" class="filter-select" onchange="App.applyFilters()">
+          <select id="filter-art" class="filter-select" aria-label="Nach Punktart filtern" onchange="App.applyFilters()">
             <option value="">Alle Arten</option>
             <option value="ps0">PS0</option>
             <option value="ps1">PS1</option>
@@ -104,7 +105,7 @@
           </select>
           <input type="text" id="filter-strecke" class="filter-input" placeholder="Strecke" oninput="App.applyFilters()">
           <input type="text" id="filter-gic" class="filter-input" placeholder="GIC" inputmode="numeric" oninput="App.applyFilters()" style="max-width:60px">
-          <select id="filter-import" class="filter-select" onchange="App.applyFilters()">
+          <select id="filter-import" class="filter-select" aria-label="Nach Import-Status filtern" onchange="App.applyFilters()">
             <option value="">Alle Status</option>
             <option value="offen">Offen</option>
             <option value="erledigt">Erledigt</option>
@@ -125,9 +126,9 @@
       </div>
       <!-- Pagination -->
       <div id="pagination" class="pagination" style="display:none">
-        <button class="pagination-btn" id="page-prev" onclick="App.prevPage()">&laquo;</button>
+        <button class="pagination-btn" id="page-prev" onclick="App.prevPage()" aria-label="Vorherige Seite"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
         <span id="page-info" class="page-info"></span>
-        <button class="pagination-btn" id="page-next" onclick="App.nextPage()">&raquo;</button>
+        <button class="pagination-btn" id="page-next" onclick="App.nextPage()" aria-label="Nächste Seite"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
       </div>
     </main>
     <button class="fab" onclick="App.showPointForm()" title="Neuen Punkt erfassen">
@@ -339,7 +340,7 @@
                   <span>Foto 1</span>
                 </div>
                 <img class="photo-preview" style="display:none">
-                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(1)" style="display:none">&times;</button>
+                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(1)" style="display:none" aria-label="Foto entfernen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </div>
               <div class="photo-slot" data-slot="2" onclick="App.capturePhoto(2)">
                 <div class="photo-placeholder">
@@ -347,7 +348,7 @@
                   <span>Foto 2</span>
                 </div>
                 <img class="photo-preview" style="display:none">
-                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(2)" style="display:none">&times;</button>
+                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(2)" style="display:none" aria-label="Foto entfernen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </div>
               <div class="photo-slot" data-slot="3" onclick="App.capturePhoto(3)">
                 <div class="photo-placeholder">
@@ -355,7 +356,7 @@
                   <span>Foto 3</span>
                 </div>
                 <img class="photo-preview" style="display:none">
-                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(3)" style="display:none">&times;</button>
+                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(3)" style="display:none" aria-label="Foto entfernen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </div>
               <div class="photo-slot" data-slot="4" onclick="App.capturePhoto(4)">
                 <div class="photo-placeholder">
@@ -363,7 +364,7 @@
                   <span>Foto 4</span>
                 </div>
                 <img class="photo-preview" style="display:none">
-                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(4)" style="display:none">&times;</button>
+                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(4)" style="display:none" aria-label="Foto entfernen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </div>
               <div class="photo-slot" data-slot="5" onclick="App.capturePhoto(5)">
                 <div class="photo-placeholder">
@@ -371,7 +372,7 @@
                   <span>Foto 5</span>
                 </div>
                 <img class="photo-preview" style="display:none">
-                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(5)" style="display:none">&times;</button>
+                <button type="button" class="photo-remove" onclick="event.stopPropagation();App.removePhoto(5)" style="display:none" aria-label="Foto entfernen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </div>
             </div>
             <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="App.onPhotoSelected(event)">
