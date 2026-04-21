@@ -157,10 +157,34 @@ body, button, input, select, textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
+  height: 100%;
   text-align: center;
   color: var(--on-surface-secondary);
-  gap: 16px;
+  gap: 20px;
+}
+
+.new-project-fab {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(21,101,192,0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.new-project-fab:active {
+  transform: scale(0.93);
+  box-shadow: 0 3px 10px rgba(21,101,192,0.3);
+}
+
+.empty-state-hint {
+  font-size: 16px;
+  color: var(--on-surface-secondary);
 }
 
 /* ============ FAB ============ */
