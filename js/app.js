@@ -100,8 +100,8 @@ const App = (() => {
               <div class="list-item-subtitle">${_escHtml(proj.projektNummer)} <span class="sep">&middot;</span> ${date}</div>
             </div>
             <span class="list-item-badge">${points.length}</span>
-            <div class="list-item-actions">
-              <button class="icon-btn" onclick="event.stopPropagation();App.confirmDeleteProject('${_escAttr(proj.projektNummer)}')" title="Löschen">
+            <div class="list-item-actions" onclick="event.stopPropagation()">
+              <button class="icon-btn" onclick="App.confirmDeleteProject('${_escAttr(proj.projektNummer)}')" title="Löschen">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
               </button>
             </div>
@@ -629,6 +629,25 @@ const App = (() => {
     if (el) el.classList.toggle('expanded');
   }
 
+  function _completenessColor(p) {
+    const checks = [];
+    checks.push(p.gpsLatitude != null && p.gpsLongitude != null);
+    switch (p.art) {
+      case 'ps0': checks.push(!!p.ps0Vermarkungsart, !!p.ps0Vermarkungstraeger); break;
+      case 'ps1': checks.push(!!p.ps1Vermarkungsart, !!p.ps1Vermarkungstraeger); break;
+      case 'ps2': checks.push(!!p.ps2Vermarkungsart, !!p.ps2Vermarkungstraeger); break;
+      case 'ps3': checks.push(!!p.ps3Vermarkungsart, !!p.ps3Vermarkungstraeger); break;
+      case 'ps4': checks.push(!!p.ps4Vermarkungsart); break;
+      case 'tp': case 'lhp': checks.push(!!p.lhpTpVermarkungsart, !!p.lhpTpVermarkungstraeger); break;
+    }
+    if (Models.GNSS_ARTS.includes(p.art)) checks.push(!!p.gnssTauglichkeit);
+    checks.push([p.foto1, p.foto2, p.foto3, p.foto4, p.foto5].some(Boolean));
+    const ratio = checks.filter(Boolean).length / checks.length;
+    if (ratio >= 1) return '#4CAF50';
+    if (ratio >= 0.5) return '#FFC107';
+    return '#FF9800';
+  }
+
   /** Renders a single point list item. */
   function _renderPointItem(p) {
     const photoCount = [p.foto1, p.foto2, p.foto3, p.foto4, p.foto5].filter(Boolean).length;
@@ -640,6 +659,7 @@ const App = (() => {
       : p.importStatus === 'erledigt'
       ? '<span class="badge badge-import-erledigt">ERLEDIGT</span>'
       : '';
+    const dotColor = _completenessColor(p);
     return `
       <div class="list-item${importClass}" onclick="App.editPoint('${_escAttr(p.punktId)}')">
         <div class="list-item-content">
@@ -653,8 +673,9 @@ const App = (() => {
             ${photoCount > 0 ? ' <span class="sep">&middot;</span> ' + photoCount + ' Foto(s)' : ''}
           </div>
         </div>
-        <div class="list-item-actions">
-          <button class="icon-btn" onclick="event.stopPropagation();App.confirmDeletePoint('${_escAttr(p.punktId)}')" title="Löschen">
+        <span class="completeness-dot" style="background:${dotColor}" title="Vollständigkeit"></span>
+        <div class="list-item-actions" onclick="event.stopPropagation()">
+          <button class="icon-btn" onclick="App.confirmDeletePoint('${_escAttr(p.punktId)}')" title="Löschen">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
           </button>
         </div>
