@@ -94,13 +94,13 @@ const App = (() => {
         const points = await DB.getPointsByProject(proj.projektNummer);
         const date = new Date(proj.angelegt).toLocaleDateString('de-DE');
         html += `
-          <div class="list-item" onclick="App.selectProject('${_escAttr(proj.projektNummer)}')">
+          <div class="list-item" onclick="event.target.closest('.list-item-actions')||App.selectProject('${_escAttr(proj.projektNummer)}')">
             <div class="list-item-content">
               <div class="list-item-title">${_escHtml(proj.bezeichnung || proj.projektNummer)}</div>
               <div class="list-item-subtitle">${_escHtml(proj.projektNummer)} <span class="sep">&middot;</span> ${date}</div>
             </div>
             <span class="list-item-badge">${points.length}</span>
-            <div class="list-item-actions" onclick="event.stopPropagation()">
+            <div class="list-item-actions">
               <button class="icon-btn" onclick="App.confirmDeleteProject('${_escAttr(proj.projektNummer)}')" title="Löschen">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
               </button>
@@ -661,7 +661,7 @@ const App = (() => {
       : '';
     const dotColor = _completenessColor(p);
     return `
-      <div class="list-item${importClass}" onclick="App.editPoint('${_escAttr(p.punktId)}')">
+      <div class="list-item${importClass}" onclick="event.target.closest('.list-item-actions')||App.editPoint('${_escAttr(p.punktId)}')">
         <div class="list-item-content">
           <div class="list-item-title">
             <span class="badge badge-${p.art}">${Models.displayName(Models.PunktArt, p.art)}</span>
@@ -674,7 +674,7 @@ const App = (() => {
           </div>
         </div>
         <span class="completeness-dot" style="background:${dotColor}" title="Vollständigkeit"></span>
-        <div class="list-item-actions" onclick="event.stopPropagation()">
+        <div class="list-item-actions">
           <button class="icon-btn" onclick="App.confirmDeletePoint('${_escAttr(p.punktId)}')" title="Löschen">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
           </button>
