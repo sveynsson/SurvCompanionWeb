@@ -17,6 +17,10 @@
   <div id="view-projects" class="view active">
     <header class="app-bar">
       <h1>SurvCompanion Web</h1>
+      <button class="icon-btn trash-btn" id="btn-open-trash" onclick="App.showTrash()" title="Papierkorb" style="display:none">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        <span class="trash-badge" id="trash-badge">0</span>
+      </button>
       <button class="icon-btn" onclick="App.showNewProjectDialog()" title="Neues Projekt">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
@@ -26,6 +30,26 @@
       <div id="no-projects" class="empty-state" style="display:none">
         <p>Keine Projekte vorhanden</p>
         <button class="btn btn-primary" onclick="App.showNewProjectDialog()">Neues Projekt anlegen</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- ========== TRASH VIEW ========== -->
+  <div id="view-trash" class="view">
+    <header class="app-bar">
+      <button class="icon-btn" onclick="App.showProjects()" title="Zurück">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <h1>Papierkorb</h1>
+      <button class="icon-btn" id="btn-empty-trash" onclick="App.confirmEmptyTrash()" title="Papierkorb leeren" style="display:none">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+      </button>
+    </header>
+    <main class="content">
+      <p class="trash-info" id="trash-info"></p>
+      <div id="trash-list" class="list"></div>
+      <div id="no-trash" class="empty-state" style="display:none">
+        <p>Papierkorb ist leer</p>
       </div>
     </main>
   </div>

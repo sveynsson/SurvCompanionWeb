@@ -13,6 +13,8 @@ const App = (() => {
   let _filteredPoints = []; // after filter applied
   let _currentPage = 0;
   const PAGE_SIZE = 25;
+  const TRASH_RETENTION_DAYS = 14;
+  const TRASH_RETENTION_MS = TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
   // ==================== INITIALIZATION ====================
 
@@ -30,6 +32,16 @@ const App = (() => {
       }
       if (typeof proj4 === 'undefined') {
         console.warn('proj4 not loaded — GK coordinate transform unavailable');
+      }
+
+      // Auto-purge expired trash entries (best effort)
+      try {
+        const purged = await DB.purgeExpiredDeleted(TRASH_RETENTION_MS);
+        for (const nr of purged) {
+          localStorage.removeItem(`sc_presets_${nr}`);
+        }
+      } catch (e) {
+        console.warn('Trash purge failed:', e);
       }
 
       // Warn before leaving with unsaved form data
@@ -60,7 +72,11 @@ const App = (() => {
     _currentProject = null;
     showView('view-projects');
     try {
-      const projects = await DB.getAllProjects();
+      const [projects, deleted] = await Promise.all([
+        DB.getAllProjects(),
+        DB.getDeletedProjects(),
+      ]);
+      _updateTrashButton(deleted.length);
       const list = document.getElementById('project-list');
       const empty = document.getElementById('no-projects');
 
@@ -126,7 +142,13 @@ const App = (() => {
     if (!nr) { showToast('Projektnummer erforderlich', 'error'); return; }
 
     const existing = await DB.getProject(nr);
-    if (existing) { showToast('Projekt existiert bereits', 'error'); return; }
+    if (existing) {
+      const msg = existing.deletedAt
+        ? 'Projektnummer liegt im Papierkorb. Erst wiederherstellen oder endgültig löschen.'
+        : 'Projekt existiert bereits';
+      showToast(msg, 'error');
+      return;
+    }
 
     const ersteller = document.getElementById('d-projErsteller').value.trim();
 
@@ -150,31 +172,189 @@ const App = (() => {
     const points = await DB.getPointsByProject(projektNummer);
     const photos = await DB.getPhotosByProject(projektNummer);
     const html = `
-      <h3>Projekt löschen?</h3>
+      <h3>Projekt in Papierkorb verschieben?</h3>
       <p class="confirm-text">
         Projekt <strong>${_escHtml(projektNummer)}</strong> mit
         <strong>${points.length}</strong> Punkten und
-        <strong>${photos.length}</strong> Fotos wird unwiderruflich gelöscht.
+        <strong>${photos.length}</strong> Fotos wird in den Papierkorb verschoben.
       </p>
-      <p class="warning-text">Diese Aktion kann nicht rückgängig gemacht werden!</p>
+      <p class="confirm-text" style="color:var(--text-secondary,#666);font-size:0.9em">
+        Wiederherstellung möglich. Endgültige Löschung automatisch nach ${TRASH_RETENTION_DAYS} Tagen.
+      </p>
       <div class="btn-row">
         <button class="btn btn-secondary" onclick="App.closeDialog()">Abbrechen</button>
-        <button class="btn btn-danger" onclick="App.doDeleteProject('${_escAttr(projektNummer)}')">Löschen</button>
+        <button class="btn btn-danger" onclick="App.doDeleteProject('${_escAttr(projektNummer)}')">In Papierkorb</button>
       </div>`;
     showDialog(html);
   }
 
   async function doDeleteProject(projektNummer) {
     try {
-      await DB.deleteProject(projektNummer);
-      // Clean up presets for this project
-      localStorage.removeItem(`sc_presets_${projektNummer}`);
+      await DB.softDeleteProject(projektNummer);
       closeDialog();
-      showToast('Projekt gelöscht', 'success');
+      showToast('Projekt in Papierkorb verschoben', 'success');
       await showProjects();
     } catch (e) {
       console.error('Delete project failed:', e);
+      showToast('Verschieben fehlgeschlagen: ' + e.message, 'error');
+    }
+  }
+
+  // ==================== TRASH ====================
+
+  function _updateTrashButton(count) {
+    const btn = document.getElementById('btn-open-trash');
+    const badge = document.getElementById('trash-badge');
+    if (!btn || !badge) return;
+    if (count > 0) {
+      btn.style.display = '';
+      badge.textContent = String(count);
+    } else {
+      btn.style.display = 'none';
+    }
+  }
+
+  function _daysRemaining(deletedAtIso) {
+    const deletedMs = new Date(deletedAtIso).getTime();
+    if (!Number.isFinite(deletedMs)) return TRASH_RETENTION_DAYS;
+    const expiresMs = deletedMs + TRASH_RETENTION_MS;
+    const remainingMs = expiresMs - Date.now();
+    return Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+  }
+
+  async function showTrash() {
+    showView('view-trash');
+    try {
+      const deleted = await DB.getDeletedProjects();
+      const list = document.getElementById('trash-list');
+      const empty = document.getElementById('no-trash');
+      const info = document.getElementById('trash-info');
+      const emptyBtn = document.getElementById('btn-empty-trash');
+
+      if (deleted.length === 0) {
+        list.innerHTML = '';
+        empty.style.display = 'flex';
+        info.textContent = '';
+        emptyBtn.style.display = 'none';
+        return;
+      }
+      empty.style.display = 'none';
+      emptyBtn.style.display = '';
+      info.textContent = `Einträge werden nach ${TRASH_RETENTION_DAYS} Tagen automatisch endgültig gelöscht.`;
+
+      deleted.sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt));
+
+      let html = '';
+      for (const proj of deleted) {
+        const points = await DB.getPointsByProject(proj.projektNummer);
+        const deletedDate = new Date(proj.deletedAt).toLocaleDateString('de-DE');
+        const daysLeft = _daysRemaining(proj.deletedAt);
+        const urgencyClass = daysLeft <= 3 ? 'trash-urgent' : '';
+        html += `
+          <div class="list-item trash-item">
+            <div class="list-item-content">
+              <div class="list-item-title">${_escHtml(proj.bezeichnung || proj.projektNummer)}</div>
+              <div class="list-item-subtitle">
+                ${_escHtml(proj.projektNummer)} <span class="sep">&middot;</span>
+                gelöscht am ${deletedDate} <span class="sep">&middot;</span>
+                <span class="${urgencyClass}">noch ${daysLeft} Tag${daysLeft === 1 ? '' : 'e'}</span>
+              </div>
+            </div>
+            <span class="list-item-badge">${points.length}</span>
+            <div class="list-item-actions">
+              <button class="icon-btn" onclick="App.doRestoreProject('${_escAttr(proj.projektNummer)}')" title="Wiederherstellen">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 10 9 10"/></svg>
+              </button>
+              <button class="icon-btn" onclick="App.confirmPermanentDelete('${_escAttr(proj.projektNummer)}')" title="Endgültig löschen">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              </button>
+            </div>
+          </div>`;
+      }
+      list.innerHTML = html;
+    } catch (e) {
+      console.error('showTrash failed:', e);
+      showToast('Fehler beim Laden des Papierkorbs', 'error');
+    }
+  }
+
+  async function doRestoreProject(projektNummer) {
+    try {
+      await DB.restoreProject(projektNummer);
+      showToast('Projekt wiederhergestellt', 'success');
+      await showTrash();
+    } catch (e) {
+      console.error('Restore failed:', e);
+      showToast('Wiederherstellen fehlgeschlagen: ' + e.message, 'error');
+    }
+  }
+
+  async function confirmPermanentDelete(projektNummer) {
+    const points = await DB.getPointsByProject(projektNummer);
+    const photos = await DB.getPhotosByProject(projektNummer);
+    const html = `
+      <h3>Endgültig löschen?</h3>
+      <p class="confirm-text">
+        Projekt <strong>${_escHtml(projektNummer)}</strong> mit
+        <strong>${points.length}</strong> Punkten und
+        <strong>${photos.length}</strong> Fotos wird <strong>unwiderruflich</strong> gelöscht.
+      </p>
+      <p class="warning-text">Diese Aktion kann nicht rückgängig gemacht werden!</p>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="App.closeDialog()">Abbrechen</button>
+        <button class="btn btn-danger" onclick="App.doPermanentDelete('${_escAttr(projektNummer)}')">Endgültig löschen</button>
+      </div>`;
+    showDialog(html);
+  }
+
+  async function doPermanentDelete(projektNummer) {
+    closeDialog();
+    showLoading('Lösche endgültig...');
+    try {
+      await DB.hardDeleteProject(projektNummer);
+      localStorage.removeItem(`sc_presets_${projektNummer}`);
+      hideLoading();
+      showToast('Projekt endgültig gelöscht', 'success');
+      await showTrash();
+    } catch (e) {
+      hideLoading();
+      console.error('Permanent delete failed:', e);
       showToast('Löschen fehlgeschlagen: ' + e.message, 'error');
+    }
+  }
+
+  async function confirmEmptyTrash() {
+    const deleted = await DB.getDeletedProjects();
+    if (deleted.length === 0) return;
+    const html = `
+      <h3>Papierkorb leeren?</h3>
+      <p class="confirm-text">
+        <strong>${deleted.length}</strong> Projekt${deleted.length === 1 ? '' : 'e'} mit allen Punkten und Fotos wird <strong>unwiderruflich</strong> gelöscht.
+      </p>
+      <p class="warning-text">Diese Aktion kann nicht rückgängig gemacht werden!</p>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="App.closeDialog()">Abbrechen</button>
+        <button class="btn btn-danger" onclick="App.doEmptyTrash()">Alle endgültig löschen</button>
+      </div>`;
+    showDialog(html);
+  }
+
+  async function doEmptyTrash() {
+    closeDialog();
+    showLoading('Leere Papierkorb...');
+    try {
+      const deleted = await DB.getDeletedProjects();
+      for (const p of deleted) {
+        await DB.hardDeleteProject(p.projektNummer);
+        localStorage.removeItem(`sc_presets_${p.projektNummer}`);
+      }
+      hideLoading();
+      showToast(`${deleted.length} Projekt${deleted.length === 1 ? '' : 'e'} endgültig gelöscht`, 'success');
+      await showTrash();
+    } catch (e) {
+      hideLoading();
+      console.error('Empty trash failed:', e);
+      showToast('Leeren fehlgeschlagen: ' + e.message, 'error');
     }
   }
 
@@ -482,7 +662,7 @@ const App = (() => {
   }
 
   async function confirmDeletePoint(punktId) {
-    const photos = await DB.getPhotosByPoint(punktId);
+    const photos = await DB.getPhotosByPoint(_currentProject, punktId);
     const html = `
       <h3>Punkt löschen?</h3>
       <p class="confirm-text">Punkt <strong>${_escHtml(punktId)}</strong> mit ${photos.length} Foto(s) wird unwiderruflich gelöscht.</p>
@@ -495,7 +675,7 @@ const App = (() => {
 
   async function doDeletePoint(punktId) {
     try {
-      await DB.deletePoint(punktId);
+      await DB.deletePoint(_currentProject, punktId);
       closeDialog();
       showToast('Punkt gelöscht', 'success');
       await showPoints();
@@ -571,14 +751,14 @@ const App = (() => {
 
   async function editPoint(punktId) {
     try {
-      const point = await DB.getPoint(punktId);
+      const point = await DB.getPoint(_currentProject, punktId);
       if (!point) { showToast('Punkt nicht gefunden', 'error'); return; }
       showPointForm(point);
       // Load existing photo previews
       for (let slot = 1; slot <= 5; slot++) {
         if (point[`foto${slot}`]) {
           try {
-            const url = await DB.getPhotoURL(punktId, slot);
+            const url = await DB.getPhotoURL(_currentProject, punktId, slot);
             if (url) {
               _photoURLs[slot] = url;
               _showPhotoPreview(slot, url);
@@ -633,11 +813,11 @@ const App = (() => {
         return;
       }
 
-      // Check for duplicate ID (only when creating new)
+      // Check for duplicate ID within current project (only when creating new)
       if (!_editingPoint) {
-        const existing = await DB.getPoint(punktId);
+        const existing = await DB.getPoint(_currentProject, punktId);
         if (existing) {
-          showToast('Punkt-ID existiert bereits', 'error');
+          showToast('Punkt-ID existiert bereits in diesem Projekt', 'error');
           _saving = false;
           return;
         }
@@ -1001,7 +1181,7 @@ const App = (() => {
 
     // If editing, also delete from DB
     if (_editingPoint) {
-      DB.deletePhoto(_editingPoint.punktId, slot).catch(e =>
+      DB.deletePhoto(_editingPoint.projektNummer, _editingPoint.punktId, slot).catch(e =>
         console.warn('Photo delete from DB failed:', e)
       );
     }
@@ -1234,22 +1414,22 @@ const App = (() => {
   }
 
   /**
-   * After a successful export, ask the user if they want to delete the
-   * exported project data to free up IndexedDB space.
+   * After a successful export, offer to move the exported project into
+   * the trash. Data remains recoverable until automatic purge.
    */
   function _showDeleteAfterExportDialog() {
     setTimeout(() => {
       const projekt = _currentProject;
       const html = `
-        <h3>Speicher freigeben?</h3>
-        <p>Der Export war erfolgreich. Möchten Sie die Daten des Projekts
-           <strong>${projekt}</strong> aus dem Gerätespeicher löschen, um Platz freizugeben?</p>
-        <p style="color:var(--warning-color,#e67e22);font-size:0.9em">
-          Stellen Sie sicher, dass der Export vollständig gespeichert wurde, bevor Sie die Daten löschen.</p>
+        <h3>Projekt in Papierkorb verschieben?</h3>
+        <p>Der Export war erfolgreich. Soll Projekt
+           <strong>${projekt}</strong> in den Papierkorb verschoben werden?</p>
+        <p style="color:var(--text-secondary,#666);font-size:0.9em">
+          Die Daten bleiben ${TRASH_RETENTION_DAYS} Tage wiederherstellbar und werden danach
+          automatisch endgültig gelöscht. Der Gerätespeicher wird erst mit der endgültigen Löschung frei.</p>
         <div class="share-actions">
-          <button class="btn btn-primary btn-block" id="btn-delete-after-export"
-                  style="background:var(--danger-color,#c0392b)">
-            Daten löschen
+          <button class="btn btn-primary btn-block" id="btn-delete-after-export">
+            In Papierkorb verschieben
           </button>
           <button class="btn btn-secondary btn-block" onclick="App.closeDialog()">
             Behalten
@@ -1258,16 +1438,16 @@ const App = (() => {
       showDialog(html);
       document.getElementById('btn-delete-after-export').addEventListener('click', async () => {
         closeDialog();
-        showLoading('Lösche Projektdaten...');
+        showLoading('Verschiebe in Papierkorb...');
         try {
-          await DB.deleteProject(projekt);
+          await DB.softDeleteProject(projekt);
           hideLoading();
-          showToast(`Projekt ${projekt} gelöscht — Speicher freigegeben`, 'success');
+          showToast(`Projekt ${projekt} in Papierkorb verschoben`, 'success');
           await showProjects();
         } catch (e) {
           hideLoading();
-          console.error('Delete after export failed:', e);
-          showToast('Löschen fehlgeschlagen: ' + e.message, 'error');
+          console.error('Soft delete after export failed:', e);
+          showToast('Verschieben fehlgeschlagen: ' + e.message, 'error');
         }
       });
     }, 500);
@@ -1393,8 +1573,8 @@ const App = (() => {
         const pktnr = cells[0];
         if (!pktnr) continue;
 
-        // Skip duplicates
-        const existing = await DB.getPoint(pktnr);
+        // Skip duplicates (within current project)
+        const existing = await DB.getPoint(_currentProject, pktnr);
         if (existing) { skipped++; continue; }
 
         // CSV columns: Pktnr, Hochwert(Y), Rechtswert(X), Höhe, Code
@@ -1561,8 +1741,8 @@ const App = (() => {
 
         const punktId = mastnummer;
 
-        // Skip duplicates
-        const existing = await DB.getPoint(punktId);
+        // Skip duplicates (within current project)
+        const existing = await DB.getPoint(_currentProject, punktId);
         if (existing) { skipped++; continue; }
 
         // Coordinates: use field_2/field_3 (GK) or geometry
@@ -1891,6 +2071,9 @@ const App = (() => {
   return {
     init, showProjects, showNewProjectDialog, createProject, selectProject,
     confirmDeleteProject, doDeleteProject,
+    // Trash
+    showTrash, doRestoreProject, confirmPermanentDelete, doPermanentDelete,
+    confirmEmptyTrash, doEmptyTrash,
     showPoints, showPointForm, editPoint, cancelPointForm, savePoint,
     confirmDeletePoint, doDeletePoint,
     onArtChanged, capturePhoto, onPhotoSelected, removePhoto,

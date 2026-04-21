@@ -337,7 +337,7 @@ const ExportService = (() => {
     let count = 0;
     for (const p of points) {
       for (const slot of _photoSlotsFor(p)) {
-        const data = await DB.getPhotoAsArrayBuffer(p.punktId, slot);
+        const data = await DB.getPhotoAsArrayBuffer(p.projektNummer, p.punktId, slot);
         if (!data) continue;
         const ext = data.mimeType === 'image/png' ? '.png' : '.jpg';
         zip.file(`${folder}/${p.punktId}_foto${slot}${ext}`, data.buffer);
@@ -440,7 +440,7 @@ const ExportService = (() => {
     // Add photos one at a time
     for (const p of points) {
       for (const slot of _photoSlotsFor(p)) {
-        const data = await DB.getPhotoAsArrayBuffer(p.punktId, slot);
+        const data = await DB.getPhotoAsArrayBuffer(p.projektNummer, p.punktId, slot);
         if (!data) continue;
         zip.file(`${p.punktId}_foto${slot}.jpg`, data.buffer);
       }

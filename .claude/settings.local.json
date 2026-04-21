@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh api *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(gh run *)",
+      "Bash(python -m http.server 8765 --bind 127.0.0.1)",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8765/index.html)",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8765/js/db.js)",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8765/js/app.js)",
+      "Bash(node -e \"new Function\\(require\\('fs'\\).readFileSync\\('js/db.js','utf8'\\)\\)\")",
+      "Bash(node -e \"new Function\\(require\\('fs'\\).readFileSync\\('js/app.js','utf8'\\)\\)\")",
+      "Bash(kill %1)"
+    ]
+  }
+}

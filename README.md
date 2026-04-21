@@ -2,7 +2,7 @@
 
 Browser-basierte Vermessungspunkt-Erfassung – die Web-Variante der [SurvCompanion](https://github.com/sveynsson/survcompanion_app) Android-App, fokussiert auf die Punkterfassungsfunktion.
 
-**Live:** [https://sveynsson.github.io/SurvCompanionWeb/](https://sveynsson.github.io/SurvCompanionWeb/)
+**Live:** [https://gi-consult.github.io/SurvCompanionWebApp/](https://gi-consult.github.io/SurvCompanionWebApp/)
 
 ## Funktionsumfang
 
