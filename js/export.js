@@ -199,11 +199,11 @@ const ExportService = (() => {
         p.strecke,
         _dn(Models.Seite, p.seite),
         _dn(Models.PunktArt, p.art),
-        p.foto1 ? `fotos/${_buildPhotoFilename(p, 1)}` : '',
-        p.foto2 ? `fotos/${_buildPhotoFilename(p, 2)}` : '',
-        p.foto3 ? `fotos/${_buildPhotoFilename(p, 3)}` : '',
-        p.foto4 ? `fotos/${_buildPhotoFilename(p, 4)}` : '',
-        p.foto5 ? `fotos/${_buildPhotoFilename(p, 5)}` : '',
+        p.foto1 ? `fotos/${p.punktId}_foto1.jpg` : '',
+        p.foto2 ? `fotos/${p.punktId}_foto2.jpg` : '',
+        p.foto3 ? `fotos/${p.punktId}_foto3.jpg` : '',
+        p.foto4 ? `fotos/${p.punktId}_foto4.jpg` : '',
+        p.foto5 ? `fotos/${p.punktId}_foto5.jpg` : '',
         p.erfassungsdatum,
         p.erfasser,
         _dn(Models.PunktTyp, p.neuOderBestand),
@@ -280,7 +280,7 @@ const ExportService = (() => {
 
     for (const p of points) {
       for (const slot of _photoSlotsFor(p)) {
-        const dateiname = _buildPhotoFilename(p, slot);
+        const dateiname = `${p.punktId}_foto${slot}.jpg`;
         let traeger = '';
         if (p.ps4GvBolzenTraeger) traeger = _dn(Models.PS4GvBolzenTraeger, p.ps4GvBolzenTraeger);
         else if (p.ps4MessmarkeTraeger) traeger = _dn(Models.PS4MessmarkeTraeger, p.ps4MessmarkeTraeger);
@@ -375,7 +375,7 @@ const ExportService = (() => {
         const data = await DB.getPhotoAsArrayBuffer(p.projektNummer, p.punktId, slot);
         if (!data) continue;
         const ext = data.mimeType === 'image/png' ? '.png' : '.jpg';
-        zip.file(`${folder}/${_buildPhotoFilename(p, slot, ext)}`, data.buffer);
+        zip.file(`${folder}/${p.punktId}_foto${slot}${ext}`, data.buffer);
         count++;
       }
     }
@@ -426,7 +426,7 @@ const ExportService = (() => {
 
     for (const p of points) {
       const fotoPfade = _photoSlotsFor(p).map(
-        slot => `_fotos/${_buildPhotoFilename(p, slot)}`
+        slot => `_fotos/${p.punktId}_foto${slot}.jpg`
       );
       const coords = [p.gpsLongitude || 0, p.gpsLatitude || 0];
       if (p.hoehe != null) coords.push(p.hoehe);
@@ -477,7 +477,7 @@ const ExportService = (() => {
       for (const slot of _photoSlotsFor(p)) {
         const data = await DB.getPhotoAsArrayBuffer(p.projektNummer, p.punktId, slot);
         if (!data) continue;
-        zip.file(_buildPhotoFilename(p, slot), data.buffer);
+        zip.file(`${p.punktId}_foto${slot}.jpg`, data.buffer);
       }
     }
 
