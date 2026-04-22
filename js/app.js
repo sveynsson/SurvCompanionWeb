@@ -1323,13 +1323,38 @@ const App = (() => {
         <h4>DB-Excel</h4>
         <p>Tab-getrennte CSV im DB-Excel Format + Fotos</p>
       </div>
+      <div class="export-option" onclick="App.showTargetdokuDialog()">
+        <h4>DB-Targetdokumentation</h4>
+        <p>ASCII-Verzeichnis + Fotos pro Punkt mit GV-Target</p>
+      </div>
       <div style="margin-top:16px">
         <button class="btn btn-secondary btn-block" onclick="App.closeDialog()">Abbrechen</button>
       </div>`;
     showDialog(html);
   }
 
-  async function doExport(format) {
+  function showTargetdokuDialog() {
+    const html = `
+      <h3>DB-Targetdokumentation</h3>
+      <div class="field-group" style="margin-bottom:16px">
+        <label class="field-label">Vermessungsstelle</label>
+        <select id="sel-vermessungsstelle" class="field-select">
+          <option value="GI-Consult">GI-Consult</option>
+          <option value="ARC-Greenlab">ARC Greenlab</option>
+          <option value="Angermeyer-Ing.">Angermeyer Ingenieure</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-block"
+        onclick="App.doExport('targetdoku', document.getElementById('sel-vermessungsstelle').value)">
+        Exportieren
+      </button>
+      <div style="margin-top:8px">
+        <button class="btn btn-secondary btn-block" onclick="App.closeDialog()">Abbrechen</button>
+      </div>`;
+    showDialog(html);
+  }
+
+  async function doExport(format, extra = null) {
     if (typeof JSZip === 'undefined') {
       closeDialog();
       showToast('Export nicht möglich — JSZip-Bibliothek konnte nicht geladen werden', 'error');
@@ -1358,6 +1383,9 @@ const App = (() => {
           break;
         case 'dbexcel':
           result = await ExportService.exportDbExcel(points, _currentProject);
+          break;
+        case 'targetdoku':
+          result = await ExportService.exportTargetdokumentation(points, _currentProject, extra || 'GI-Consult');
           break;
       }
       hideLoading();
@@ -2099,7 +2127,7 @@ const App = (() => {
     confirmDeletePoint, doDeletePoint,
     onArtChanged, capturePhoto, onPhotoSelected, removePhoto,
     captureGPS, toggleSection,
-    showExportDialog, doExport,
+    showExportDialog, showTargetdokuDialog, doExport,
     showDialog, closeDialog, showToast,
     // Presets
     togglePresets, savePresets,

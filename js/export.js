@@ -137,6 +137,41 @@ const ExportService = (() => {
     return slots;
   }
 
+  /**
+   * Builds a photo filename according to the DB naming convention:
+   * {Streckennummer}_{KM-Wert}_{L/R}_{Mastnummer/Typ}_{Datum}{ext}
+   *
+   * KM-Wert uses '000,00' as placeholder when station is not captured.
+   * A sequential suffix (_1, _2, …) is appended when a point has multiple photos.
+   */
+  function _buildPhotoFilename(p, slot, ext = '.jpg') {
+    const slots = _photoSlotsFor(p);
+    const seiteMap = { links: 'L', rechts: 'R', mittig: 'M' };
+
+    const strecke = String(p.strecke ?? '0000');
+    const km      = p.station != null ? p.station.toFixed(2).replace('.', ',') : '000,00';
+    const seite   = seiteMap[p.seite] ?? '';
+
+    let mastOderTraeger = '';
+    if (p.ps4MastNummer) {
+      mastOderTraeger = String(p.ps4MastNummer).replace(/\s+/g, '-').slice(0, 13);
+    } else {
+      let traeger = '';
+      if (p.ps4GvBolzenTraeger)         traeger = _dn(Models.PS4GvBolzenTraeger,    p.ps4GvBolzenTraeger);
+      else if (p.ps4MessmarkeTraeger)   traeger = _dn(Models.PS4MessmarkeTraeger,   p.ps4MessmarkeTraeger);
+      else if (p.ps4AllgemeinerTraeger) traeger = _dn(Models.PS4AllgemeinerTraeger, p.ps4AllgemeinerTraeger);
+      mastOderTraeger = traeger.replace(/[\s()]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 13);
+    }
+
+    const datum = new Date(p.erfassungsdatum);
+    const datumStr = `${datum.getFullYear()}${String(datum.getMonth() + 1).padStart(2, '0')}${String(datum.getDate()).padStart(2, '0')}`;
+
+    let base = [strecke, km, seite, mastOderTraeger, datumStr].join('_');
+    if (slots.length > 1) base += `_${slots.indexOf(slot) + 1}`;
+
+    return base + ext;
+  }
+
   // ==================== QGIS CSV ====================
 
   function _generateQgisCsv(points, projektNummer) {
@@ -164,11 +199,11 @@ const ExportService = (() => {
         p.strecke,
         _dn(Models.Seite, p.seite),
         _dn(Models.PunktArt, p.art),
-        p.foto1 ? `fotos/${p.punktId}_foto1.jpg` : '',
-        p.foto2 ? `fotos/${p.punktId}_foto2.jpg` : '',
-        p.foto3 ? `fotos/${p.punktId}_foto3.jpg` : '',
-        p.foto4 ? `fotos/${p.punktId}_foto4.jpg` : '',
-        p.foto5 ? `fotos/${p.punktId}_foto5.jpg` : '',
+        p.foto1 ? `fotos/${_buildPhotoFilename(p, 1)}` : '',
+        p.foto2 ? `fotos/${_buildPhotoFilename(p, 2)}` : '',
+        p.foto3 ? `fotos/${_buildPhotoFilename(p, 3)}` : '',
+        p.foto4 ? `fotos/${_buildPhotoFilename(p, 4)}` : '',
+        p.foto5 ? `fotos/${_buildPhotoFilename(p, 5)}` : '',
         p.erfassungsdatum,
         p.erfasser,
         _dn(Models.PunktTyp, p.neuOderBestand),
@@ -245,7 +280,7 @@ const ExportService = (() => {
 
     for (const p of points) {
       for (const slot of _photoSlotsFor(p)) {
-        const dateiname = `${p.punktId}_foto${slot}.jpg`;
+        const dateiname = _buildPhotoFilename(p, slot);
         let traeger = '';
         if (p.ps4GvBolzenTraeger) traeger = _dn(Models.PS4GvBolzenTraeger, p.ps4GvBolzenTraeger);
         else if (p.ps4MessmarkeTraeger) traeger = _dn(Models.PS4MessmarkeTraeger, p.ps4MessmarkeTraeger);
@@ -340,7 +375,7 @@ const ExportService = (() => {
         const data = await DB.getPhotoAsArrayBuffer(p.projektNummer, p.punktId, slot);
         if (!data) continue;
         const ext = data.mimeType === 'image/png' ? '.png' : '.jpg';
-        zip.file(`${folder}/${p.punktId}_foto${slot}${ext}`, data.buffer);
+        zip.file(`${folder}/${_buildPhotoFilename(p, slot, ext)}`, data.buffer);
         count++;
       }
     }
@@ -391,7 +426,7 @@ const ExportService = (() => {
 
     for (const p of points) {
       const fotoPfade = _photoSlotsFor(p).map(
-        slot => `_fotos/${p.punktId}_foto${slot}.jpg`
+        slot => `_fotos/${_buildPhotoFilename(p, slot)}`
       );
       const coords = [p.gpsLongitude || 0, p.gpsLatitude || 0];
       if (p.hoehe != null) coords.push(p.hoehe);
@@ -442,12 +477,88 @@ const ExportService = (() => {
       for (const slot of _photoSlotsFor(p)) {
         const data = await DB.getPhotoAsArrayBuffer(p.projektNummer, p.punktId, slot);
         if (!data) continue;
-        zip.file(`${p.punktId}_foto${slot}.jpg`, data.buffer);
+        zip.file(_buildPhotoFilename(p, slot), data.buffer);
       }
     }
 
     const ts = Date.now();
     return _buildZip(zip, `db_excel_export_${projektNummer}_${ts}.zip`);
+  }
+
+  // ==================== EXPORT: DB-TARGETDOKUMENTATION ====================
+
+  async function exportTargetdokumentation(points, projektNummer, vermessungsstelle) {
+    const zip = new JSZip();
+    const seiteMap = { links: 'L', rechts: 'R', mittig: 'M' };
+
+    const targetPoints = points.filter(p => p.ps4TargetVorhanden || p.ps4GvPfostenTargetVorhanden);
+    if (targetPoints.length === 0) {
+      throw new Error('Keine Punkte mit GV-Target gefunden');
+    }
+
+    const stelle = (vermessungsstelle || 'GI-Consult').replace(/\s+/g, '-').slice(0, 15);
+
+    for (const p of targetPoints) {
+      // GK coordinates: prefer DB-Ref import values, fall back to GPS conversion
+      let rw = null, hw = null;
+      if (p.dbrefX != null && p.dbrefY != null) {
+        rw = p.dbrefX;
+        hw = p.dbrefY;
+      } else if (p.gpsLatitude != null && p.gpsLongitude != null) {
+        const gk = _wgs84ToDbRefGk(p.gpsLatitude, p.gpsLongitude);
+        if (gk) { rw = gk.rechtswert; hw = gk.hochwert; }
+      }
+
+      const strecke = String(p.strecke ?? '0000');
+      const km      = p.station != null ? p.station.toFixed(2).replace('.', ',') : '000,00';
+      const seite   = seiteMap[p.seite] ?? '';
+
+      let mastOderTraeger = '';
+      if (p.ps4MastNummer) {
+        mastOderTraeger = String(p.ps4MastNummer).replace(/\s+/g, '-').slice(0, 13);
+      } else {
+        let traeger = '';
+        if (p.ps4GvBolzenTraeger)         traeger = _dn(Models.PS4GvBolzenTraeger,    p.ps4GvBolzenTraeger);
+        else if (p.ps4MessmarkeTraeger)   traeger = _dn(Models.PS4MessmarkeTraeger,   p.ps4MessmarkeTraeger);
+        else if (p.ps4AllgemeinerTraeger) traeger = _dn(Models.PS4AllgemeinerTraeger, p.ps4AllgemeinerTraeger);
+        mastOderTraeger = traeger.replace(/[\s()]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 13);
+      }
+
+      const datum = new Date(p.erfassungsdatum);
+      const datumStr = `${datum.getFullYear()}${String(datum.getMonth() + 1).padStart(2, '0')}${String(datum.getDate()).padStart(2, '0')}`;
+
+      // Folder name follows the same photo naming convention (without slot suffix)
+      const folderName = [strecke, km, seite, mastOderTraeger, datumStr].join('_');
+
+      // Verzeichnis filename: {GV-Offset}_{Strecke}_{KM-Anfang}_{KM-Ende}_{Datum}.txt
+      const offset = p.ps4TargetOffset != null ? Math.round(p.ps4TargetOffset) : 0;
+      const verzeichnisName = `${offset}_${strecke}_${km}_${km}_${datumStr}.txt`;
+
+      // ASCII Verzeichnis content — fields separated by single space, no spaces within fields
+      const nb     = strecke.slice(0, 6);                               // Nummerierungsbezirk S6 (use strecke as proxy)
+      const rwStr  = rw != null ? rw.toFixed(3).replace('.', ',') : '-';  // Rechtswert F11.3
+      const hwStr  = hw != null ? hw.toFixed(3).replace('.', ',') : '-';  // Hochwert F11.3
+      const hStr   = p.hoehe != null ? p.hoehe.toFixed(3).replace('.', ',') : '-';  // Höhe F8.3
+      const bez    = 'DB_REF2016';                                       // Bezugssystem S10
+      const mast   = mastOderTraeger || '-';                             // Mastnummer/Traeger S13
+      const offStr = String(offset);                                     // Offset D2
+
+      const content = [nb, km, seite, rwStr, hwStr, hStr, bez, mast, offStr, datumStr, stelle].join(' ') + '\r\n';
+
+      zip.file(`${folderName}/${verzeichnisName}`, content);
+
+      // Photos for this point
+      for (const slot of _photoSlotsFor(p)) {
+        const data = await DB.getPhotoAsArrayBuffer(p.projektNummer, p.punktId, slot);
+        if (!data) continue;
+        const ext = data.mimeType === 'image/png' ? '.png' : '.jpg';
+        zip.file(`${folderName}/${_buildPhotoFilename(p, slot, ext)}`, data.buffer);
+      }
+    }
+
+    const now = new Date();
+    const ds  = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    return _buildZip(zip, `DB_Targetdoku_${projektNummer}_${ds}.zip`);
   }
 
   // ==================== ZIP BUILD ====================
@@ -518,7 +629,7 @@ const ExportService = (() => {
   }
 
   return {
-    exportUnified, exportCSVWithPhotos, exportGeoJSON, exportDbExcel,
+    exportUnified, exportCSVWithPhotos, exportGeoJSON, exportDbExcel, exportTargetdokumentation,
     canNativeShare, shareFile, downloadFile,
     dbRefGkToWgs84,
     coordToWgs84,
